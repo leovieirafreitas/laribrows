@@ -7,7 +7,7 @@ import { createBookingAction } from "@/app/(site)/agendar/actions";
 import { Calendar, type DayStatus } from "@/components/booking/Calendar";
 import { formatBRL, formatDuration, formatPhone } from "@/lib/format";
 import type { PublicSettings } from "@/lib/settings";
-import { addMonths, formatDateLong, minToTime } from "@/lib/time";
+import { addMonths, formatDateLong, minToTime, STUDIO_TZ_LABEL } from "@/lib/time";
 
 type ServiceOption = { id: string; name: string; description: string; durationMin: number; priceCents: number };
 
@@ -233,7 +233,8 @@ export function BookingFlow({
                 />
               </div>
               <div className="md:border-l md:border-lavender-100 md:pl-8">
-                <h2 className="mb-5 font-display text-3xl">Horário</h2>
+                <h2 className="font-display text-3xl">Horário</h2>
+                <p className="mb-5 text-xs text-plum-600/60">Todos os horários no {STUDIO_TZ_LABEL}.</p>
                 {!date && <p className="text-sm text-plum-600/70">Selecione um dia disponível no calendário.</p>}
                 {date && (
                   <>
@@ -343,7 +344,7 @@ export function BookingFlow({
                   ) : (
                     <div className="grid gap-3 sm:grid-cols-2">
                       {s.pixEnabled && (
-                        <MethodOption active={method === "PIX"} onClick={() => setMethod("PIX")} icon={<QrCode className="size-5" />} title="PIX" hint="Aprovação na hora" />
+                        <MethodOption active={method === "PIX"} onClick={() => setMethod("PIX")} icon={<QrCode className="size-5" />} title="PIX" hint={s.pixHint} />
                       )}
                       {s.cardEnabled && (
                         <MethodOption
@@ -351,7 +352,7 @@ export function BookingFlow({
                           onClick={() => setMethod("CARD")}
                           icon={<CreditCard className="size-5" />}
                           title="Cartão de crédito"
-                          hint={s.maxInstallments > 1 ? `Em até ${s.maxInstallments}x` : "À vista"}
+                          hint={s.cardHint}
                         />
                       )}
                     </div>
@@ -362,7 +363,12 @@ export function BookingFlow({
               <label className="mt-7 flex cursor-pointer items-start gap-3 rounded-2xl bg-lavender-50 p-4 text-sm leading-relaxed text-plum-700">
                 <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} className="mt-1 size-4 accent-plum-900" />
                 <span>
-                  <strong className="font-medium text-plum-900">Política de agendamento.</strong> {s.cancellationPolicy}
+                  <strong className="font-medium text-plum-900">Política de agendamento.</strong> {s.cancellationPolicy}{" "}
+                  Seus dados são usados só para o atendimento —{" "}
+                  <a href="/privacidade" target="_blank" className="text-lavender-700 underline underline-offset-2">
+                    veja a Política de Privacidade
+                  </a>
+                  .
                 </span>
               </label>
 
@@ -414,7 +420,7 @@ export function BookingFlow({
           <dl className="space-y-3 px-6 py-5 text-sm">
             <Row label="Duração" value={service ? formatDuration(service.durationMin) : "—"} />
             <Row label="Data" value={date ? <span>{formatDateLong(date)}</span> : "—"} />
-            <Row label="Horário" value={time != null ? minToTime(time) : "—"} />
+            <Row label="Horário" value={time != null ? `${minToTime(time)} (Manaus)` : "—"} />
             <div className="hairline my-2" />
             <Row label="Valor do procedimento" value={service ? formatBRL(service.priceCents) : "—"} />
             {service && s.chargeMode !== "none" && (

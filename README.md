@@ -9,7 +9,7 @@ Visual lavanda e champagne, tipografia serifada elegante, pensado para celular.
 - Página inicial com procedimentos, valores e duração
 - Agendamento em 4 passos: procedimento → dia e horário → dados → pagamento
 - Calendário mostra só dias com horários livres (fechados, lotados e passados ficam apagados)
-- Pagamento via **PIX** (QR Code + copia e cola) ou **cartão de crédito** (parcelado)
+- Pagamento via **PIX** ou **cartão de crédito em até 12x** (InfinitePay), ou PIX com a chave do studio
 - **Sinal de entrada** (padrão 50%), com opção da cliente pagar o total
 - Página do agendamento atualiza sozinha quando o PIX cai; botão "Adicionar à agenda"
 
@@ -43,26 +43,27 @@ Sem `DATABASE_URL`, o app usa um Postgres embutido (PGlite) em `./data/pglite` �
 Com `DATABASE_URL` apontando para o Supabase, usa o banco de produção.
 
 - Site: http://localhost:3000
-- Painel: http://localhost:3000/admin — entra com `ADMIN_EMAIL` / `ADMIN_PASSWORD` do `.env.local`.
+- Painel: http://localhost:3000/admin — o primeiro acesso é criado pelo `npm run db:seed` com `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Esqueceu a senha? Use "Esqueci minha senha" na tela de login (link por e-mail, vale 30 min).
   Troque a senha em **Configurações → Seu acesso** depois do primeiro login.
 
 ## Formas de receber
 
 | Opção | Como funciona | Precisa |
 |---|---|---|
-| **PIX automático** | QR Code do Mercado Pago; confirma sozinho | `MP_ACCESS_TOKEN` |
-| **Cartão de crédito** | Checkout seguro do Mercado Pago, parcelado | `MP_ACCESS_TOKEN` |
-| **PIX com chave própria** | QR Code gerado com a sua chave, sem taxa. A cliente toca em "Já fiz o PIX" e você confirma no painel | só a chave PIX (em Configurações) |
-| **Modo simulação** | Sem credenciais, tudo funciona com botões de "simular pagamento" para testar | nada |
+| **InfinitePay** (principal) | Checkout seguro da InfinitePay: PIX ou cartão em até 12x. Confirmação automática | `INFINITEPAY_HANDLE` (sua InfiniteTag) |
+| **PIX com chave própria** | QR Code com a sua chave, sem taxa. A cliente toca em "Já fiz o PIX" e você confirma no painel | só a chave PIX (em Configurações) |
+| Mercado Pago (alternativa) | PIX automático + Checkout Pro | `MP_ACCESS_TOKEN` |
+| Modo simulação | Botões de "simular pagamento" para testar sem cobrar | `ALLOW_PAYMENT_SIMULATION="true"` — **só no computador de testes** |
 
-### Conectando o Mercado Pago
-1. Acesse https://www.mercadopago.com.br/developers/panel/app e crie uma aplicação (Checkout Pro / Pagamentos online).
-2. Copie o **Access Token** (comece pelas credenciais de teste, `TEST-...`) para `MP_ACCESS_TOKEN` no `.env.local`.
-3. Com o site publicado, cadastre o webhook em *Suas integrações → Webhooks* apontando para
-   `https://SEU-DOMINIO/api/webhooks/mercadopago` (evento **Pagamentos**) e copie a assinatura secreta para `MP_WEBHOOK_SECRET`.
-4. Para PIX automático, a conta precisa ter uma chave PIX cadastrada no Mercado Pago.
+Sem nenhuma forma configurada, o site **não oferece** pagamento online (e recusa tentativas). A simulação nunca liga sozinha.
 
-O sistema nunca confia só no aviso do webhook: ele consulta o pagamento na API do Mercado Pago e confere o valor antes de confirmar.
+### InfinitePay
+- `INFINITEPAY_HANDLE`: sua InfiniteTag **sem o `$`**.
+- `INFINITEPAY_API_KEY` (recomendada, `inchk_...`): tira a etapa "endereço de entrega" do pagamento (é um serviço no studio) e faz o link expirar junto com a reserva, aceitando um único pagamento. Crie em InfinitePay → Configurações do Checkout → Checkout Integrado → API Key (aparece uma vez só).
+- O aviso de pagamento (webhook) é configurado sozinho em cada link (`/api/webhooks/infinitepay`) — só funciona com o site publicado em `https://`.
+- O webhook da InfinitePay não é assinado: o sistema **sempre confirma** com a InfinitePay (`/payment_check`) antes de aprovar. Dados forjados não aprovam nada.
+- Não existe ambiente de testes na InfinitePay: o teste final é uma compra real de baixo valor (mínimo R$ 1,00).
+- Documentação: https://www.infinitepay.io/checkout-documentacao
 
 ## Banco de dados: Supabase
 
@@ -76,23 +77,53 @@ O banco de produção é o Postgres do Supabase (projeto `upulfsocjkboblonpdea`)
 ### Login da área da cliente (Supabase Auth)
 
 - Usa `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
-- **Antes de abrir para as clientes, configure um SMTP próprio** (Supabase → Authentication → Emails → SMTP Settings; recomendado: Resend).
-  Sem isso, o e-mail padrão do Supabase **só entrega para membros da sua organização** no Supabase e tem limite de poucos e-mails por hora.
-- Com o SMTP configurado, aplique os modelos em português de `supabase/email/` (com código de 6 dígitos + link que funciona em qualquer aparelho).
-- Em produção, ajuste em Authentication → URL Configuration: **Site URL** = seu domínio e inclua `https://seu-dominio/**` nas Redirect URLs.
+- E-mails de acesso enviados pelo **Resend** (SMTP próprio, já configurado no Supabase): remetente `Lari Brows <larissa@laribrows.com.br>`, domínio `laribrows.com.br` verificado.
+- Modelos em português de `supabase/email/` já aplicados (código de 6 dígitos + botão que funciona em qualquer aparelho).
+  O botão usa o endereço do site que enviou o e-mail (`NEXT_PUBLIC_SITE_URL`), então funciona tanto local quanto em produção.
+- URL Configuration: Site URL = `https://laribrows.com.br`; Redirect URLs liberadas para `laribrows.com.br`, `www.laribrows.com.br` e `localhost:3000`.
+- Limite: 60 e-mails/hora no Supabase (e 100/dia no plano grátis do Resend).
 
 ## Publicando (produção)
 
-Sugestão: **Vercel** (site) + **Supabase** (banco).
+O site roda em qualquer servidor com Docker (`Dockerfile` na raiz, saída `standalone` do Next.js).
+O banco continua no **Supabase**.
 
-1. Na Vercel, configure as variáveis do `.env.example` (`DATABASE_URL` do pooler, `SESSION_SECRET`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPABASE_*`, `MP_*`).
-2. Faça o deploy.
+### EasyPanel
+
+1. **Fonte → Git**: URL `https://github.com/leovieirafreitas/laribrows.git`, ramo `main`, caminho de build `/`.
+2. **Construção (Build)**: escolha **Dockerfile** (arquivo `Dockerfile`).
+3. **Ambiente**: cole as variáveis da tabela abaixo.
+4. **Domínios**: adicione `laribrows.com.br` (e `www.laribrows.com.br`), com HTTPS, apontando para a **porta 3000**.
+   No DNS do domínio, crie um registro **A** de `@` (e de `www`) para o IP do servidor.
+   Não apague os registros do Resend (e-mail) que já estão lá.
+5. **Implantar**. Cada novo `git push` na `main` pode ser publicado com "Implantar" (ou ative o deploy automático).
+
+As variáveis `NEXT_PUBLIC_*` são lidas quando o servidor roda (`src/lib/env.ts`), então não precisam existir no build.
+
+### Variáveis de ambiente
+
+| Variável | Valor |
+|---|---|
+| `DATABASE_URL` | URL do *Transaction pooler* do Supabase (porta 6543), com a senha |
+| `SESSION_SECRET` | uma chave **nova** (`openssl rand -base64 32`) |
+| `NEXT_PUBLIC_SITE_URL` | `https://laribrows.com.br` |
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | do Supabase |
+| `RESEND_API_KEY` | chave do Resend ("Esqueci minha senha" do painel) |
+| `EMAIL_FROM` | `Lari Brows <larissa@laribrows.com.br>` |
+| `INFINITEPAY_HANDLE` | sua InfiniteTag (sem `$`) |
+| `INFINITEPAY_API_KEY` | recomendada: tira a etapa de endereço de entrega e faz o link expirar com a reserva |
+| `ALLOW_PAYMENT_SIMULATION` | **não defina** (ou `false`) |
+
+Também funciona na **Vercel** (importe o repositório e cadastre as mesmas variáveis; o `vercel.json` coloca o servidor em `iad1`, perto do banco em Ohio).
+
+**Desempenho:** o banco está em Ohio (EUA). Com o servidor no Brasil, cada consulta leva ~150–200 ms.
+Se o painel ficar lento, o caminho é mover o Supabase para São Paulo (`sa-east-1`) ou usar um servidor nos EUA.
 
 ## Regras importantes
 
 - Ao escolher o horário, a vaga fica **reservada por 30 min** (configurável) enquanto a cliente paga. Se não pagar, o horário volta a ficar livre.
 - Duas clientes nunca conseguem pegar o mesmo horário: a checagem é feita dentro de uma transação com trava por dia (`pg_advisory_xact_lock`).
-- Datas e horários seguem o fuso de São Paulo, independente do servidor.
+- Datas e horários seguem o **horário de Manaus** (UTC−4), independente de onde o servidor ou a cliente estiverem. Para mudar, troque `STUDIO_TZ` em `src/lib/time.ts`.
 
 ## Estrutura
 

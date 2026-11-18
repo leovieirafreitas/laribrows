@@ -3,7 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { computeSlots, loadScheduleContext } from "@/lib/availability";
 import { appointments, db, payments, type Appointment, type Settings } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
-import { formatDateShort, minToTime, studioToDate } from "@/lib/time";
+import { formatDateShort, formatStudioDateTime, minToTime, studioToDate } from "@/lib/time";
 
 export class ClientActionError extends Error {}
 
@@ -30,7 +30,7 @@ export function changePolicy(a: Appointment, s: Settings) {
   };
 }
 
-const stamp = () => new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+const stamp = () => formatStudioDateTime(new Date());
 
 async function ownedAppointment(id: string, email: string) {
   const a = await db.query.appointments.findFirst({ where: and(eq(appointments.id, id), eq(appointments.clientEmail, email)) });

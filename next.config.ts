@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Servidor enxuto para Docker (EasyPanel): .next/standalone/server.js
+  output: "standalone",
   // App 100% dinâmico (agenda, pagamentos, painel): usamos o modelo de
   // renderização dinâmica clássico em vez de Cache Components.
   cacheComponents: false,

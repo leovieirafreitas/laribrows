@@ -29,7 +29,7 @@ export async function sendCodeAction(_prev: LoginState, fd: FormData): Promise<L
   const supabase = await createSupabase();
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { shouldCreateUser: true, emailRedirectTo: `${siteUrl()}/auth/confirm?next=/minha-conta` },
+    options: { shouldCreateUser: true, emailRedirectTo: siteUrl() },
   });
   if (error) {
     console.error("[entrar] signInWithOtp", error.message);

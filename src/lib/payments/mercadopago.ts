@@ -1,5 +1,6 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { toStudioIso } from "@/lib/time";
 
 /**
  * Integração direta com a API REST do Mercado Pago.
@@ -35,11 +36,8 @@ async function mp<T>(path: string, init: RequestInit & { idempotencyKey?: string
 
 const isPublicUrl = (url: string) => url.startsWith("https://") && !url.includes("localhost");
 
-/** Formato aceito pelo MP: 2026-11-17T21:30:00.000-03:00 */
-function mpDate(d: Date) {
-  const local = new Date(d.getTime() - 3 * 60 * 60 * 1000);
-  return local.toISOString().replace("Z", "-03:00");
-}
+/** Formato aceito pelo MP: 2026-11-17T21:30:00.000-04:00 (fuso do studio). */
+const mpDate = (d: Date) => toStudioIso(d);
 
 export async function createPixPayment(opts: {
   amountCents: number;

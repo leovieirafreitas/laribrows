@@ -13,11 +13,12 @@ import { ActionForm } from "@/components/admin/ActionForm";
 import { PageHeader } from "@/components/admin/AppointmentItem";
 import { StatusBadge } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/client";
+import { DateField, SelectField, TimeField } from "@/components/ui/pickers";
 import { appointments, db, payments } from "@/lib/db";
 import { centsToInput, formatBRL, formatDuration, whatsappLink } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
 import { METHOD_LABEL, PAYMENT_STATUS_LABEL, PROVIDER_LABEL } from "@/lib/status";
-import { formatDateLong, minToTime } from "@/lib/time";
+import { formatDateLong, formatStudioDateTime, minToTime } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Agendamento" };
@@ -117,12 +118,12 @@ export default async function AgendamentoAdminPage({ params }: { params: Promise
                   </div>
                   <div className="w-44">
                     <label className="label">Forma</label>
-                    <select name="method" className="field" defaultValue="PIX">
-                      <option value="PIX">PIX</option>
-                      <option value="CARD">Cartão</option>
-                      <option value="CASH">Dinheiro</option>
-                      <option value="OTHER">Outro</option>
-                    </select>
+                    <SelectField name="method" ariaLabel="Forma de pagamento" panelClassName="w-48" options={[
+                { value: "PIX", label: "PIX" },
+                { value: "CARD", label: "Cartão" },
+                { value: "CASH", label: "Dinheiro" },
+                { value: "OTHER", label: "Outro" },
+              ]} />
                   </div>
                   <SubmitButton className="btn btn-soft">Registrar</SubmitButton>
                 </div>
@@ -133,13 +134,13 @@ export default async function AgendamentoAdminPage({ params }: { params: Promise
               <ActionForm action={rescheduleAction.bind(null, a.id)} className="mt-6 border-t border-lavender-100 pt-5">
                 <p className="text-sm font-medium text-plum-800">Remarcar</p>
                 <div className="mt-3 flex flex-wrap items-end gap-3">
-                  <div>
+                  <div className="w-52">
                     <label className="label">Data</label>
-                    <input type="date" name="date" defaultValue={a.date} className="field" />
+                    <DateField name="date" defaultValue={a.date} />
                   </div>
-                  <div>
+                  <div className="w-32">
                     <label className="label">Horário</label>
-                    <input type="time" name="time" step={300} defaultValue={minToTime(a.startMin)} className="field" />
+                    <TimeField name="time" defaultValue={minToTime(a.startMin)} ariaLabel="Novo horário" />
                   </div>
                   <SubmitButton className="btn btn-soft">Remarcar</SubmitButton>
                 </div>
@@ -170,7 +171,7 @@ export default async function AgendamentoAdminPage({ params }: { params: Promise
                   <tbody className="divide-y divide-lavender-100">
                     {pays.map((p) => (
                       <tr key={p.id}>
-                        <td className="py-2.5 text-plum-700">{(p.paidAt ?? p.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })}</td>
+                        <td className="py-2.5 text-plum-700">{formatStudioDateTime(p.paidAt ?? p.createdAt)}</td>
                         <td className="py-2.5">{METHOD_LABEL[p.method]}</td>
                         <td className="py-2.5 text-plum-600/70">{PROVIDER_LABEL[p.provider] ?? p.provider}</td>
                         <td className="py-2.5">
@@ -224,7 +225,7 @@ export default async function AgendamentoAdminPage({ params }: { params: Promise
           </section>
 
           <p className="px-2 text-xs text-plum-600/50">
-            Criado em {a.createdAt.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })}
+            Criado em {formatStudioDateTime(a.createdAt)}
           </p>
         </div>
       </div>

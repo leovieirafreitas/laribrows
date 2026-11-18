@@ -1,6 +1,7 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { db, settings, type Settings } from "@/lib/db";
+import { infinitePayConfigured } from "@/lib/payments/infinitepay";
 
 async function loadSettings(): Promise<Settings> {
   const row = await db.query.settings.findFirst({ where: eq(settings.id, 1) });
@@ -35,13 +36,45 @@ export function mercadoPagoConfigured() {
   return Boolean(process.env.MP_ACCESS_TOKEN?.trim());
 }
 
+/** Quem processa PIX/cartão online: InfinitePay (preferida) ou Mercado Pago. */
+export function onlineGateway(): "infinitepay" | "mercadopago" | null {
+  if (infinitePayConfigured()) return "infinitepay";
+  if (mercadoPagoConfigured()) return "mercadopago";
+  return null;
+}
+
+export const GATEWAY_LABEL = { infinitepay: "InfinitePay", mercadopago: "Mercado Pago" } as const;
+
+/**
+ * Simulação de pagamentos (botão "aprovar" sem cobrar nada) só quando ligada de propósito
+ * com ALLOW_PAYMENT_SIMULATION=true — use só no computador de testes, nunca no site publicado.
+ */
+export function paymentSimulationAllowed() {
+  return !onlineGateway() && process.env.ALLOW_PAYMENT_SIMULATION === "true";
+}
+
+/** Formas de pagamento que funcionam de verdade agora (configuração do painel + credenciais). */
+export function availableMethods(s: Settings) {
+  const online = onlineGateway() !== null;
+  const sim = paymentSimulationAllowed();
+  const pixManual = s.pixProvider === "manual" && Boolean(s.pixKey);
+  const pix = s.pixEnabled && (pixManual || online || sim);
+  const card = s.cardEnabled && (online || sim);
+  return {
+    pix,
+    card,
+    /** Alguma forma vai cair na simulação. */
+    simulation: !online && sim && ((s.pixEnabled && !pixManual) || s.cardEnabled),
+    /** Algo foi ligado no painel mas não funciona por falta de credencial. */
+    missingSetup: (s.pixEnabled && !pix) || (s.cardEnabled && !card),
+  };
+}
+
 export function mercadoPagoIsTest() {
   return process.env.MP_ACCESS_TOKEN?.startsWith("TEST-") ?? false;
 }
 
-export function siteUrl() {
-  return (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
-}
+export { siteUrl } from "@/lib/env";
 
 /** Valor cobrado no ato do agendamento. */
 export function computeDueNow(s: Settings, totalCents: number, payOption: "DEPOSIT" | "FULL") {
@@ -52,6 +85,20 @@ export function computeDueNow(s: Settings, totalCents: number, payOption: "DEPOS
   return Math.round((totalCents * pct) / 100);
 }
 
+/**
+ * Como a taxa do cartão aparece para a cliente (InfinitePay).
+ * absorbedUpTo = até quantas parcelas o studio assume a taxa; acima disso, a InfinitePay soma a taxa ao valor.
+ */
+export function cardFeeText(absorbedUpTo: number) {
+  if (absorbedUpTo >= 12) return { short: "Em até 12x sem acréscimo", long: "Cartão de crédito em até 12x sem acréscimo." };
+  if (absorbedUpTo <= 0)
+    return { short: "Em até 12x · com taxa do cartão", long: "No cartão de crédito, a taxa do cartão é somada ao valor (PIX sem acréscimo)." };
+  return {
+    short: `Até ${absorbedUpTo}x sem acréscimo`,
+    long: `Cartão em até ${absorbedUpTo}x sem acréscimo; de ${absorbedUpTo + 1}x a 12x, a taxa do cartão é somada ao valor.`,
+  };
+}
+
 /** Configuração pública, segura para mandar ao navegador. */
 export function publicSettings(s: Settings) {
   return {
@@ -59,9 +106,13 @@ export function publicSettings(s: Settings) {
     chargeMode: s.chargeMode,
     depositPercent: s.depositPercent,
     allowFullPayment: s.allowFullPayment,
-    pixEnabled: s.pixEnabled,
-    cardEnabled: s.cardEnabled,
+    // Só oferece à cliente o que funciona de verdade.
+    pixEnabled: availableMethods(s).pix,
+    cardEnabled: availableMethods(s).card,
     maxInstallments: s.maxInstallments,
+    /** Textos curtos das opções de pagamento. */
+    cardHint: onlineGateway() === "infinitepay" ? cardFeeText(s.cardFeeAbsorbedUpTo).short : s.maxInstallments > 1 ? `Em até ${s.maxInstallments}x` : "À vista",
+    pixHint: onlineGateway() === "infinitepay" && s.cardFeeAbsorbedUpTo < 12 ? "Sem acréscimo · aprovação na hora" : "Aprovação na hora",
     cancellationPolicy: s.cancellationPolicy,
   };
 }

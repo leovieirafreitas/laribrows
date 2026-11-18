@@ -8,6 +8,6 @@
 <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#5a4672">Que bom ter você por aqui! Use o código abaixo para entrar na sua área da cliente, ou toque no botão.</p>
 <p style="margin:0 0 6px;font-size:11px;letter-spacing:3px;color:#8a7a9e;text-transform:uppercase">seu código</p>
 <p style="margin:0 0 28px;font-family:Georgia,serif;font-size:40px;letter-spacing:10px;color:#2a2039">{{ .Token }}</p>
-<a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/minha-conta" style="display:inline-block;background:#2a2039;color:#ffffff;text-decoration:none;font-size:12px;letter-spacing:3px;text-transform:uppercase;padding:14px 28px;border-radius:999px">Entrar na minha conta</a>
+<a href="{{ .RedirectTo }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/minha-conta" style="display:inline-block;background:#2a2039;color:#ffffff;text-decoration:none;font-size:12px;letter-spacing:3px;text-transform:uppercase;padding:14px 28px;border-radius:999px">Entrar na minha conta</a>
 <p style="margin:28px 0 0;font-size:12px;line-height:1.6;color:#8a7a9e">O código vale por 1 hora. Se não foi você, é só ignorar este e-mail.</p>
 </td></tr></table></td></tr></table></body></html>

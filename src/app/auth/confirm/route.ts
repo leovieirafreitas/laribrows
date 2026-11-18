@@ -1,5 +1,6 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+import { siteUrl } from "@/lib/env";
 import { createSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -19,12 +20,12 @@ export async function GET(request: NextRequest) {
   // Modelo de e-mail próprio (supabase/email): link com token_hash — funciona em qualquer aparelho.
   if (tokenHash) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
-    if (!error) return NextResponse.redirect(new URL(next, request.url));
+    if (!error) return NextResponse.redirect(new URL(next, siteUrl()));
   }
   // E-mail padrão do Supabase: volta com ?code= (precisa ser aberto no mesmo navegador).
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(new URL(next, request.url));
+    if (!error) return NextResponse.redirect(new URL(next, siteUrl()));
   }
-  return NextResponse.redirect(new URL("/entrar?erro=link", request.url));
+  return NextResponse.redirect(new URL("/entrar?erro=link", siteUrl()));
 }

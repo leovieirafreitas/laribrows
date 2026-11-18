@@ -4,6 +4,7 @@ import { addOverrideAction, deleteOverrideAction, saveWorkingHoursAction } from 
 import { ActionForm } from "@/components/admin/ActionForm";
 import { PageHeader } from "@/components/admin/AppointmentItem";
 import { SubmitButton } from "@/components/ui/client";
+import { DateField, TimeField } from "@/components/ui/pickers";
 import { dateOverrides, db, workingHours } from "@/lib/db";
 import { formatDateCompact, isValidDate, minToTime, todayInStudio, WEEKDAYS_LONG } from "@/lib/time";
 
@@ -41,13 +42,13 @@ export default async function HorariosPage({ searchParams }: { searchParams: Pro
                       {WEEKDAYS_LONG[d]}
                     </label>
                     <div className="col-span-2 flex flex-wrap items-center gap-2 text-sm sm:col-span-1">
-                      <input type="time" name={`start_${d}`} defaultValue={minToTime(h?.startMin ?? 540)} className="field w-28 px-3 py-2" aria-label="Início" />
+                      <TimeField name={`start_${d}`} defaultValue={minToTime(h?.startMin ?? 540)} className="w-28 px-3 py-2" ariaLabel={`Início — ${WEEKDAYS_LONG[d]}`} />
                       <span className="text-plum-600/50">às</span>
-                      <input type="time" name={`end_${d}`} defaultValue={minToTime(h?.endMin ?? 1080)} className="field w-28 px-3 py-2" aria-label="Fim" />
+                      <TimeField name={`end_${d}`} defaultValue={minToTime(h?.endMin ?? 1080)} className="w-28 px-3 py-2" ariaLabel={`Fim — ${WEEKDAYS_LONG[d]}`} />
                       <span className="ml-1 text-xs text-plum-600/50">pausa</span>
-                      <input type="time" name={`break_start_${d}`} defaultValue={h?.breakStartMin != null ? minToTime(h.breakStartMin) : ""} className="field w-28 px-3 py-2" aria-label="Início da pausa" />
+                      <TimeField name={`break_start_${d}`} defaultValue={h?.breakStartMin != null ? minToTime(h.breakStartMin) : ""} allowEmpty placeholder="—" className="w-28 px-3 py-2" ariaLabel={`Início da pausa — ${WEEKDAYS_LONG[d]}`} />
                       <span className="text-plum-600/50">–</span>
-                      <input type="time" name={`break_end_${d}`} defaultValue={h?.breakEndMin != null ? minToTime(h.breakEndMin) : ""} className="field w-28 px-3 py-2" aria-label="Fim da pausa" />
+                      <TimeField name={`break_end_${d}`} defaultValue={h?.breakEndMin != null ? minToTime(h.breakEndMin) : ""} allowEmpty placeholder="—" align="right" className="w-28 px-3 py-2" ariaLabel={`Fim da pausa — ${WEEKDAYS_LONG[d]}`} />
                     </div>
                   </div>
                 );
@@ -66,11 +67,11 @@ export default async function HorariosPage({ searchParams }: { searchParams: Pro
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label">De</label>
-                  <input type="date" name="from" required min={today} defaultValue={openDate} className="field" />
+                  <DateField name="from" min={today} defaultValue={openDate} />
                 </div>
                 <div>
                   <label className="label">Até (opcional)</label>
-                  <input type="date" name="to" min={today} className="field" />
+                  <DateField name="to" min={today} placeholder="Mesmo dia" align="right" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -84,11 +85,11 @@ export default async function HorariosPage({ searchParams }: { searchParams: Pro
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label">Início (especial)</label>
-                  <input type="time" name="start" defaultValue="09:00" className="field" />
+                  <TimeField name="start" defaultValue="09:00" ariaLabel="Início do horário especial" />
                 </div>
                 <div>
                   <label className="label">Fim (especial)</label>
-                  <input type="time" name="end" defaultValue="18:00" className="field" />
+                  <TimeField name="end" defaultValue="18:00" align="right" ariaLabel="Fim do horário especial" />
                 </div>
               </div>
               <div>

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Jost } from "next/font/google";
 import "./globals.css";
+import { siteUrl } from "@/lib/env";
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
@@ -16,6 +17,9 @@ const jost = Jost({
 });
 
 export const metadata: Metadata = {
+  // Endereço público: usado para montar os links da imagem de compartilhamento.
+  metadataBase: new URL(siteUrl()),
+  openGraph: { type: "website", locale: "pt_BR", siteName: "Lari Brows" },
   title: {
     default: "Lari Brows · Studio de Sobrancelhas",
     template: "%s · Lari Brows",

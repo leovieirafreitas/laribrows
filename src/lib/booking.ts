@@ -2,8 +2,9 @@ import "server-only";
 import { and, eq, gt, inArray, lt, ne, sql } from "drizzle-orm";
 import { appointments, db, payments, services, type Appointment, type Payment, type Settings } from "@/lib/db";
 import { BLOCKING_STATUSES, computeSlots, loadScheduleContext } from "@/lib/availability";
-import { computeDueNow, getSettings, mercadoPagoConfigured, siteUrl } from "@/lib/settings";
+import { availableMethods, computeDueNow, getSettings, mercadoPagoConfigured, paymentSimulationAllowed, siteUrl } from "@/lib/settings";
 import { buildPixCode } from "@/lib/payments/pix-brcode";
+import * as infinitepay from "@/lib/payments/infinitepay";
 import * as mercadopago from "@/lib/payments/mercadopago";
 import { formatDateShort, minToTime } from "@/lib/time";
 
@@ -47,8 +48,9 @@ export async function createBooking(input: CreateBookingInput) {
   const needsPayment = dueNow > 0;
   if (needsPayment) {
     if (!input.method) throw new BookingError("Escolha a forma de pagamento.");
-    if (input.method === "PIX" && !s.pixEnabled) throw new BookingError("PIX indisponível no momento.");
-    if (input.method === "CARD" && !s.cardEnabled) throw new BookingError("Cartão indisponível no momento.");
+    const methods = availableMethods(s);
+    if (input.method === "PIX" && !methods.pix) throw new BookingError("PIX indisponível no momento.");
+    if (input.method === "CARD" && !methods.card) throw new BookingError("Cartão indisponível no momento.");
   }
 
   const holdMinutes = Math.max(s.holdMinutes, input.method === "PIX" && usesMercadoPagoPix(s) ? 30 : 10);
@@ -89,9 +91,7 @@ export async function createBooking(input: CreateBookingInput) {
 
   try {
     const payment = await createPayment(s, appointment, input.method!, dueNow);
-    if (input.method === "CARD" && payment.checkoutUrl) {
-      return { appointment, redirectTo: payment.checkoutUrl };
-    }
+    if (payment.checkoutUrl) return { appointment, redirectTo: payment.checkoutUrl };
     return { appointment, redirectTo: `/agendamento/${appointment.id}` };
   } catch (err) {
     // Libera o horário se o gateway falhar.
@@ -115,8 +115,22 @@ export async function createPayment(s: Settings, appt: Appointment, method: "PIX
   const notificationUrl = `${siteUrl()}/api/webhooks/mercadopago`;
 
   let values: typeof payments.$inferInsert;
+  const pixManual = s.pixProvider === "manual" && Boolean(s.pixKey);
 
-  if (method === "PIX") {
+  if (infinitepay.infinitePayConfigured() && !(method === "PIX" && pixManual)) {
+    // Checkout InfinitePay: a cliente paga com PIX ou cartão na página segura deles.
+    const r = await infinitepay.createCheckoutLink({
+      orderNsu: paymentId,
+      amountCents,
+      description: `${s.studioName} · ${description}`,
+      redirectUrl: backUrl,
+      webhookUrl: `${siteUrl()}/api/webhooks/infinitepay`,
+      customer: { name: appt.clientName, email: appt.clientEmail, phone: appt.clientPhone },
+      expiresAt,
+      cardFeeAbsorbedUpTo: s.cardFeeAbsorbedUpTo,
+    });
+    values = { id: paymentId, appointmentId: appt.id, provider: "infinitepay", method, kind, amountCents, checkoutUrl: r.url };
+  } else if (method === "PIX") {
     if (s.pixProvider === "manual" && s.pixKey) {
       values = {
         id: paymentId,
@@ -144,8 +158,8 @@ export async function createPayment(s: Settings, appt: Appointment, method: "PIX
         notificationUrl,
       });
       values = { id: paymentId, appointmentId: appt.id, provider: "mercadopago", providerRef: r.id, method: "PIX", kind, amountCents, pixCode: r.pixCode };
-    } else {
-      // Modo simulação (sem credenciais): QR de exemplo + botão para aprovar.
+    } else if (paymentSimulationAllowed()) {
+      // Modo simulação (só em testes): QR de exemplo + botão para aprovar.
       values = {
         id: paymentId,
         appointmentId: appt.id,
@@ -155,6 +169,8 @@ export async function createPayment(s: Settings, appt: Appointment, method: "PIX
         amountCents,
         pixCode: buildPixCode({ key: "simulacao@laribrows.com", amountCents, receiverName: s.studioName, receiverCity: "SAO PAULO", txid: appt.code }),
       };
+    } else {
+      throw new BookingError("PIX indisponível no momento.");
     }
   } else {
     if (mercadoPagoConfigured()) {
@@ -171,7 +187,7 @@ export async function createPayment(s: Settings, appt: Appointment, method: "PIX
         statementDescriptor: s.studioName,
       });
       values = { id: paymentId, appointmentId: appt.id, provider: "mercadopago", providerRef: `pref_${r.id}`, method: "CARD", kind, amountCents, checkoutUrl: r.checkoutUrl };
-    } else {
+    } else if (paymentSimulationAllowed()) {
       values = {
         id: paymentId,
         appointmentId: appt.id,
@@ -181,6 +197,8 @@ export async function createPayment(s: Settings, appt: Appointment, method: "PIX
         amountCents,
         checkoutUrl: `/pagamento/simulado/${paymentId}`,
       };
+    } else {
+      throw new BookingError("Cartão indisponível no momento.");
     }
   }
 
@@ -239,6 +257,24 @@ export async function rejectPayment(paymentId: string, status: "REJECTED" | "CAN
     .update(payments)
     .set({ status })
     .where(and(eq(payments.id, paymentId), eq(payments.status, "PENDING")));
+}
+
+/**
+ * Confirma um pagamento da InfinitePay (vindo do webhook ou do retorno da cliente).
+ * Nada é aprovado sem a InfinitePay confirmar pelo /payment_check.
+ */
+export async function syncInfinitePayPayment(opts: { orderNsu: string; transactionNsu: string; slug: string }) {
+  const local = await db.query.payments.findFirst({ where: eq(payments.id, opts.orderNsu) });
+  if (!local || local.provider !== "infinitepay") return null;
+  if (local.status === "APPROVED") return local;
+  const check = await infinitepay.paymentCheck(opts);
+  if (!check.paid) return local;
+  if (check.amountCents < local.amountCents) {
+    console.warn("[infinitepay] valor pago menor que o esperado", opts.orderNsu, check.amountCents, local.amountCents);
+    return local;
+  }
+  if (check.method) await db.update(payments).set({ method: check.method }).where(eq(payments.id, local.id));
+  return approvePayment(local.id, { providerRef: opts.transactionNsu });
 }
 
 /** Consulta o Mercado Pago e atualiza o pagamento local. */

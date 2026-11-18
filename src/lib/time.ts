@@ -1,10 +1,11 @@
 /**
  * Datas do studio são guardadas como "YYYY-MM-DD" e horários como minutos
- * desde a meia-noite, sempre no fuso do studio. Assim a agenda não sofre com
+ * desde a meia-noite, sempre no fuso do studio (Manaus). Assim a agenda não sofre com
  * o fuso do servidor (que em produção costuma ser UTC).
  * Este arquivo é usado no servidor e no navegador.
  */
-export const STUDIO_TZ = "America/Sao_Paulo";
+export const STUDIO_TZ = "America/Manaus"; // UTC−4, sem horário de verão
+export const STUDIO_TZ_LABEL = "horário de Manaus";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -110,8 +111,33 @@ export function formatMonth(month: string) {
 export const WEEKDAYS_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 export const WEEKDAYS_LONG = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
-/** Converte data+minuto do studio para um instante UTC (São Paulo não tem horário de verão desde 2019: UTC-3). */
+/** Diferença do fuso do studio para UTC, em minutos, no instante dado (Manaus = −240). */
+export function studioOffsetMinutes(at: Date = new Date()) {
+  const tz =
+    new Intl.DateTimeFormat("en-US", { timeZone: STUDIO_TZ, timeZoneName: "longOffset" })
+      .formatToParts(at)
+      .find((p) => p.type === "timeZoneName")?.value ?? "GMT";
+  const m = tz.match(/GMT([+-])(\d{1,2}):?(\d{2})?/);
+  if (!m) return 0;
+  return (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] ?? 0));
+}
+
+/** Converte data+minuto do studio para o instante real (UTC). */
 export function studioToDate(date: string, minutes: number) {
   const [y, m, d] = date.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d, 0, minutes) + 3 * 60 * 60 * 1000);
+  const naive = Date.UTC(y, m - 1, d, 0, minutes);
+  return new Date(naive - studioOffsetMinutes(new Date(naive)) * 60_000);
+}
+
+/** Instante no formato ISO com o fuso do studio: "2026-11-17T21:30:00.000-04:00". */
+export function toStudioIso(at: Date) {
+  const off = studioOffsetMinutes(at);
+  const local = new Date(at.getTime() + off * 60_000);
+  const abs = Math.abs(off);
+  return local.toISOString().replace("Z", `${off < 0 ? "-" : "+"}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`);
+}
+
+/** "18/11/2026, 14:05" no fuso do studio. */
+export function formatStudioDateTime(at: Date) {
+  return at.toLocaleString("pt-BR", { timeZone: STUDIO_TZ, dateStyle: "short", timeStyle: "short" });
 }

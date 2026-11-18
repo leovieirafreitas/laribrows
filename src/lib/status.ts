@@ -26,6 +26,7 @@ export const METHOD_LABEL: Record<PaymentMethod, string> = {
 };
 
 export const PROVIDER_LABEL: Record<string, string> = {
+  infinitepay: "InfinitePay",
   mercadopago: "Mercado Pago",
   pix_manual: "PIX direto",
   simulated: "Simulação",

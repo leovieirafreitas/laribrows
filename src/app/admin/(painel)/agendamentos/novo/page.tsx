@@ -5,6 +5,7 @@ import { createManualAppointmentAction } from "@/app/admin/actions";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { PageHeader } from "@/components/admin/AppointmentItem";
 import { SubmitButton } from "@/components/ui/client";
+import { DateField, SelectField, TimeField } from "@/components/ui/pickers";
 import { db, services } from "@/lib/db";
 import { formatBRL } from "@/lib/format";
 import { todayInStudio } from "@/lib/time";
@@ -27,22 +28,21 @@ export default async function NovoAgendamentoPage({ searchParams }: { searchPara
       <ActionForm action={createManualAppointmentAction} className="card space-y-5 p-6 sm:p-8">
         <div>
           <label className="label">Procedimento</label>
-          <select name="serviceId" required className="field">
-            {list.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} — {formatBRL(s.priceCents)} ({s.durationMin} min){s.active ? "" : " · inativo"}
-              </option>
-            ))}
-          </select>
+          <SelectField
+            name="serviceId"
+            ariaLabel="Procedimento"
+            panelClassName="w-[22rem]"
+            options={list.map((s) => ({ value: s.id, label: s.name, hint: `${formatBRL(s.priceCents)} · ${s.durationMin} min${s.active ? "" : " · inativo"}` }))}
+          />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label">Data</label>
-            <input type="date" name="date" required defaultValue={data ?? todayInStudio()} className="field" />
+            <DateField name="date" defaultValue={data ?? todayInStudio()} />
           </div>
           <div>
             <label className="label">Horário</label>
-            <input type="time" name="time" required step={300} defaultValue="09:00" className="field" />
+            <TimeField name="time" defaultValue="09:00" align="right" ariaLabel="Horário" />
           </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -70,12 +70,12 @@ export default async function NovoAgendamentoPage({ searchParams }: { searchPara
           </div>
           <div>
             <label className="label">Forma</label>
-            <select name="method" className="field" defaultValue="PIX">
-              <option value="PIX">PIX</option>
-              <option value="CARD">Cartão</option>
-              <option value="CASH">Dinheiro</option>
-              <option value="OTHER">Outro</option>
-            </select>
+            <SelectField name="method" ariaLabel="Forma de pagamento" align="right" panelClassName="w-48" options={[
+                { value: "PIX", label: "PIX" },
+                { value: "CARD", label: "Cartão" },
+                { value: "CASH", label: "Dinheiro" },
+                { value: "OTHER", label: "Outro" },
+              ]} />
           </div>
         </div>
         <div>

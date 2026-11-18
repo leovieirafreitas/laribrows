@@ -124,7 +124,7 @@ function UpcomingCard({ a, s }: { a: Appointment; s: Settings }) {
           <StatusBadge status={a.status} />
         </div>
         <p className="mt-1 flex items-center gap-1.5 text-sm text-plum-700/80">
-          <Clock className="size-3.5" /> {formatDateLong(a.date)}, às {minToTime(a.startMin)}
+          <Clock className="size-3.5" /> {formatDateLong(a.date)}, às {minToTime(a.startMin)} (Manaus)
         </p>
         <p className="mt-1 text-xs text-plum-600/70">
           {a.paidCents > 0 ? `Pago ${formatBRL(a.paidCents)}` : "Nada pago ainda"}

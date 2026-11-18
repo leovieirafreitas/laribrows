@@ -71,7 +71,10 @@ export function SiteFooter({ s }: { s: Settings }) {
             Agendar meu horário
           </Link>
           <p className="mt-6 text-xs text-lavender-200/50">
-            © {new Date().getFullYear()} {s.studioName}
+            © {new Date().getFullYear()} {s.studioName} ·{" "}
+            <Link href="/privacidade" className="underline decoration-lavender-200/30 underline-offset-2 hover:text-white">
+              Política de Privacidade
+            </Link>
           </p>
         </div>
       </div>

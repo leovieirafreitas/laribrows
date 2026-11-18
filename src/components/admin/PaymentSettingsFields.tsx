@@ -1,10 +1,36 @@
 "use client";
 
 import { useState } from "react";
+import { SelectField } from "@/components/ui/pickers";
 import type { Settings } from "@/lib/db/schema";
 
 /** Campos de cobrança com exibição condicional (sinal %, PIX manual...). */
-export function PaymentSettingsFields({ s, mpConfigured }: { s: Settings; mpConfigured: boolean }) {
+function cardFeeOptions(current: number) {
+  const opts = [
+    { value: "0", label: "A cliente paga a taxa", hint: "Somada no crédito, em qualquer parcela" },
+    { value: "1", label: "Studio paga só à vista (1x)", hint: "De 2x em diante, a cliente paga" },
+    { value: "3", label: "Studio paga até 3x", hint: "De 4x em diante, a cliente paga" },
+    { value: "6", label: "Studio paga até 6x", hint: "De 7x em diante, a cliente paga" },
+    { value: "12", label: "Studio paga sempre", hint: "Sem acréscimo para a cliente" },
+  ];
+  if (!opts.some((o) => o.value === String(current))) {
+    opts.push({ value: String(current), label: `Studio paga até ${current}x`, hint: `De ${current + 1}x em diante, a cliente paga` });
+  }
+  return opts;
+}
+
+export function PaymentSettingsFields({
+  s,
+  gateway,
+  simulation,
+  infinitePayKey,
+}: {
+  s: Settings;
+  gateway: string | null;
+  simulation: boolean;
+  infinitePayKey: boolean;
+}) {
+  const gatewayName = gateway ?? "InfinitePay";
   const [mode, setMode] = useState(s.chargeMode);
   const [pct, setPct] = useState(s.depositPercent);
   const [pixEnabled, setPixEnabled] = useState(s.pixEnabled);
@@ -74,7 +100,7 @@ export function PaymentSettingsFields({ s, mpConfigured }: { s: Settings; mpConf
                   <span className="mt-3 grid gap-2 sm:grid-cols-2">
                     <label className={`cursor-pointer rounded-xl border p-3 text-sm ${pixProvider === "mercadopago" ? "border-plum-900 bg-lavender-50" : "border-lavender-200"}`}>
                       <input type="radio" name="pixProvider" value="mercadopago" checked={pixProvider === "mercadopago"} onChange={() => setPixProvider("mercadopago")} className="mr-2 accent-plum-900" />
-                      Automático (Mercado Pago)
+                      Automático ({gatewayName})
                       <span className="mt-1 block text-xs text-plum-600/70">Confirma sozinho quando a cliente paga.</span>
                     </label>
                     <label className={`cursor-pointer rounded-xl border p-3 text-sm ${pixProvider === "manual" ? "border-plum-900 bg-lavender-50" : "border-lavender-200"}`}>
@@ -118,17 +144,39 @@ export function PaymentSettingsFields({ s, mpConfigured }: { s: Settings; mpConf
                 <span className="font-medium text-plum-900">Cartão de crédito</span>
               </label>
               <span className="block pl-7">
-                <span className="block text-xs text-plum-600/70">Via Mercado Pago (checkout seguro).</span>
-                {cardEnabled && (
+                <span className="block text-xs text-plum-600/70">Via {gatewayName} (checkout seguro).</span>
+                {cardEnabled && gateway === "InfinitePay" && (
+                  <span className="mt-3 block space-y-2">
+                    <span className="block text-xs text-plum-600/70">Parcelamento em até 12x direto no checkout da InfinitePay.</span>
+                    <span className="block text-sm text-plum-700">Taxa do cartão</span>
+                    <span className="block w-full max-w-xs">
+                      <SelectField
+                        name="cardFeeAbsorbedUpTo"
+                        ariaLabel="Quem paga a taxa do cartão"
+                        defaultValue={String(s.cardFeeAbsorbedUpTo)}
+                        panelClassName="w-80"
+                        options={cardFeeOptions(s.cardFeeAbsorbedUpTo)}
+                      />
+                    </span>
+                    <span className="block text-xs leading-relaxed text-plum-600/70">
+                      Quando a cliente paga, a InfinitePay soma a taxa ao valor no crédito e você recebe o valor cheio. O PIX nunca tem acréscimo.
+                      {!infinitePayKey && " Para valer, cadastre a INFINITEPAY_API_KEY (sem ela vale o que estiver no app da InfinitePay)."}
+                    </span>
+                  </span>
+                )}
+                {cardEnabled && gateway !== "InfinitePay" && (
                   <span className="mt-3 flex items-center gap-2 text-sm">
                     Parcelar em até
-                    <select name="maxInstallments" defaultValue={s.maxInstallments} className="field w-20 px-3 py-1.5">
-                      {Array.from({ length: 12 }, (_, i) => (
-                        <option key={i + 1} value={i + 1}>
-                          {i + 1}x
-                        </option>
-                      ))}
-                    </select>
+                    <span className="w-24">
+                      <SelectField
+                        name="maxInstallments"
+                        ariaLabel="Parcelas"
+                        defaultValue={String(s.maxInstallments)}
+                        className="px-3 py-1.5"
+                        panelClassName="w-28"
+                        options={Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: `${i + 1}x` }))}
+                      />
+                    </span>
                   </span>
                 )}
               </span>
@@ -136,12 +184,12 @@ export function PaymentSettingsFields({ s, mpConfigured }: { s: Settings; mpConf
             {!cardEnabled && <input type="hidden" name="maxInstallments" value={s.maxInstallments} />}
           </div>
 
-          {!mpConfigured && (cardEnabled || (pixEnabled && pixProvider === "mercadopago")) && (
+          {!gateway && (cardEnabled || (pixEnabled && pixProvider === "mercadopago")) && (
             <p className="rounded-2xl border border-dashed border-champagne-400 px-4 py-3 text-xs leading-relaxed text-champagne-600">
-              O Mercado Pago ainda não está conectado, então cartão{pixProvider === "mercadopago" ? " e PIX automático" : ""} funcionam em modo simulação.
+              A InfinitePay ainda não está conectada: cartão{pixProvider === "mercadopago" ? " e PIX automático" : ""}{" "}
+              {simulation ? "funcionam em modo simulação neste computador de testes" : "ficam indisponíveis para as clientes"}.
             </p>
-          )}
-        </>
+          )}        </>
       )}
       {mode === "none" && (
         <>

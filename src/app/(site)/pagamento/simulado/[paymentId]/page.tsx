@@ -5,6 +5,7 @@ import { simulatePaymentAction } from "@/app/(site)/agendamento/[id]/actions";
 import { SubmitButton } from "@/components/ui/client";
 import { db, payments } from "@/lib/db";
 import { formatBRL } from "@/lib/format";
+import { paymentSimulationAllowed } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pagamento (simulação)", robots: { index: false } };
@@ -12,6 +13,7 @@ export const metadata = { title: "Pagamento (simulação)", robots: { index: fal
 /** Tela que imita o checkout para testar o fluxo sem gateway configurado. */
 export default async function SimulatedCheckout({ params }: { params: Promise<{ paymentId: string }> }) {
   const { paymentId } = await params;
+  if (!paymentSimulationAllowed()) notFound();
   const p = await db.query.payments.findFirst({ where: eq(payments.id, paymentId) });
   if (!p || p.provider !== "simulated") notFound();
 
@@ -25,7 +27,7 @@ export default async function SimulatedCheckout({ params }: { params: Promise<{ 
         <h1 className="display mt-4 text-3xl">Simular {p.method === "PIX" ? "PIX" : "cartão de crédito"}</h1>
         <p className="mt-2 font-display text-4xl">{formatBRL(p.amountCents)}</p>
         <p className="mt-4 text-sm leading-relaxed text-plum-700/80">
-          Nenhuma cobrança real acontece aqui. Configure o Mercado Pago no arquivo <code>.env.local</code> para receber pagamentos de verdade.
+          Nenhuma cobrança real acontece aqui. Esta tela só existe no ambiente de testes.
         </p>
         {p.status === "PENDING" ? (
           <div className="mt-8 flex flex-col gap-3">

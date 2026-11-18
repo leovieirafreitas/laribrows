@@ -1,20 +1,21 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarCheck2, CalendarDays, Hourglass, Plus, Wallet } from "lucide-react";
+import { AlertTriangle, CalendarCheck2, CalendarDays, CircleCheck, Hourglass, Plus, Wallet } from "lucide-react";
 import { confirmPendingPaymentAction } from "@/app/admin/actions";
 import { AppointmentItem, PageHeader } from "@/components/admin/AppointmentItem";
 import { RevenueChart } from "@/components/admin/RevenueChart";
 import { SubmitButton } from "@/components/ui/client";
 import { getDashboardData } from "@/lib/admin-data";
 import { formatBRL } from "@/lib/format";
-import { getSettings, mercadoPagoConfigured } from "@/lib/settings";
+import { availableMethods, getSettings } from "@/lib/settings";
 import { formatDateCompact, formatDateLong, minToTime } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
 
-export default async function DashboardPage() {
-  const [d, s] = await Promise.all([getDashboardData(), getSettings()]);
-  const simulation = s.chargeMode !== "none" && !mercadoPagoConfigured() && (s.cardEnabled || (s.pixEnabled && s.pixProvider === "mercadopago"));
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ senha?: string }> }) {
+  const [d, s, { senha }] = await Promise.all([getDashboardData(), getSettings(), searchParams]);
+  const methods = availableMethods(s);
+  const paymentWarning = s.chargeMode !== "none" && (methods.simulation || methods.missingSetup);
   const hour = Math.floor(d.nowMinutes / 60);
   const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
 
@@ -26,12 +27,33 @@ export default async function DashboardPage() {
         </Link>
       </PageHeader>
 
-      {simulation && (
+      {senha === "redefinida" && (
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-lavender-200 bg-lavender-50 px-5 py-4 text-sm text-plum-700">
+          <CircleCheck className="size-4 shrink-0 text-lavender-600" />
+          <p>
+            <strong className="font-medium">Senha redefinida.</strong> Da próxima vez, entre com a senha nova.
+          </p>
+        </div>
+      )}
+
+      {paymentWarning && (
         <div className="mb-6 flex items-start gap-3 rounded-2xl border border-champagne-300 bg-champagne-200/50 px-5 py-4 text-sm text-champagne-600">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <p>
-            <strong className="font-medium">Pagamentos em modo simulação.</strong> Configure o token do Mercado Pago no <code>.env.local</code> (ou use
-            &quot;Chave PIX própria&quot; em <Link href="/admin/configuracoes" className="underline">Configurações</Link>) para receber de verdade.
+            {methods.simulation ? (
+              <>
+                <strong className="font-medium">Pagamentos em modo simulação</strong> (só neste computador de testes).
+              </>
+            ) : (
+              <>
+                <strong className="font-medium">Parte dos pagamentos online está indisponível.</strong>
+              </>
+            )}{" "}
+            Conecte a InfinitePay (variável <code>INFINITEPAY_HANDLE</code>) ou use &quot;Chave PIX própria&quot; em{" "}
+            <Link href="/admin/configuracoes" className="underline">
+              Configurações
+            </Link>
+            .
           </p>
         </div>
       )}

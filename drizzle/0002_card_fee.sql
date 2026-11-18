@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "card_fee_absorbed_up_to" integer DEFAULT 0 NOT NULL;

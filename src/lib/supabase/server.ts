@@ -1,15 +1,18 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { supabaseEnv } from "@/lib/env";
 
 export function supabaseConfigured() {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+  const { url, key } = supabaseEnv();
+  return Boolean(url && key);
 }
 
 /** Cliente do Supabase Auth para Server Components, Server Actions e Route Handlers. */
 export async function createSupabase() {
   const cookieStore = await cookies();
-  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
+  const { url, key } = supabaseEnv();
+  return createServerClient(url, key, {
     cookies: {
       getAll() {
         return cookieStore.getAll();

@@ -319,7 +319,11 @@ export async function saveSettingsAction(section: "studio" | "payments" | "sched
       pixKey: str(fd, "pixKey"),
       pixReceiverName: str(fd, "pixReceiverName"),
       pixReceiverCity: str(fd, "pixReceiverCity"),
-      maxInstallments: Math.min(12, Math.max(1, Math.round(num(fd, "maxInstallments", 1)))),
+      // Campos que só aparecem para um dos gateways: se não vieram no formulário, mantém o valor salvo.
+      ...(fd.has("maxInstallments") ? { maxInstallments: Math.min(12, Math.max(1, Math.round(num(fd, "maxInstallments", 1)))) } : {}),
+      ...(fd.has("cardFeeAbsorbedUpTo")
+        ? { cardFeeAbsorbedUpTo: Math.min(12, Math.max(0, Math.round(num(fd, "cardFeeAbsorbedUpTo", 0)))) }
+        : {}),
       cancellationPolicy: str(fd, "cancellationPolicy").slice(0, 800),
     };
   }

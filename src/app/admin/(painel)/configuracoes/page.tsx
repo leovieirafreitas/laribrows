@@ -5,14 +5,15 @@ import { PageHeader } from "@/components/admin/AppointmentItem";
 import { PaymentSettingsFields } from "@/components/admin/PaymentSettingsFields";
 import { SubmitButton } from "@/components/ui/client";
 import { requireAdmin } from "@/lib/auth";
-import { getSettings, mercadoPagoConfigured, mercadoPagoIsTest, siteUrl } from "@/lib/settings";
+import { infinitePayHandle, infinitePayHasApiKey } from "@/lib/payments/infinitepay";
+import { GATEWAY_LABEL, getSettings, mercadoPagoIsTest, onlineGateway, paymentSimulationAllowed, siteUrl } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Configurações" };
 
 export default async function ConfiguracoesPage() {
   const [s, admin] = await Promise.all([getSettings(), requireAdmin()]);
-  const mp = mercadoPagoConfigured();
+  const gateway = onlineGateway();
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -20,10 +21,23 @@ export default async function ConfiguracoesPage() {
 
       {/* Pagamentos */}
       <Section title="Pagamentos" text="Defina se o agendamento pede sinal, valor total ou nenhum pagamento online.">
-        <div className={`mb-6 flex items-start gap-3 rounded-2xl px-4 py-3 text-sm ${mp ? "bg-emerald-50 text-emerald-800" : "bg-lavender-50 text-plum-700"}`}>
-          {mp ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <CircleAlert className="mt-0.5 size-4 shrink-0 text-lavender-600" />}
+        <div className={`mb-6 flex items-start gap-3 rounded-2xl px-4 py-3 text-sm ${gateway ? "bg-emerald-50 text-emerald-800" : "bg-lavender-50 text-plum-700"}`}>
+          {gateway ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <CircleAlert className="mt-0.5 size-4 shrink-0 text-lavender-600" />}
           <div className="leading-relaxed">
-            {mp ? (
+            {gateway === "infinitepay" ? (
+              <>
+                <strong className="font-medium">InfinitePay conectada</strong> (InfiniteTag <code>${infinitePayHandle()}</code>). PIX e cartão em até 12x pelo checkout
+                seguro da InfinitePay; a confirmação é automática.
+                {!process.env.INFINITEPAY_API_KEY && (
+                  <>
+                    <br />
+                    <span className="text-emerald-700/80">
+                      Opcional: com a chave de API (<code>INFINITEPAY_API_KEY</code>), o link de pagamento expira junto com a reserva.
+                    </span>
+                  </>
+                )}
+              </>
+            ) : gateway === "mercadopago" ? (
               <>
                 <strong className="font-medium">Mercado Pago conectado</strong> {mercadoPagoIsTest() ? "(credenciais de TESTE)" : "(produção)"}.
                 <br />
@@ -31,14 +45,20 @@ export default async function ConfiguracoesPage() {
               </>
             ) : (
               <>
-                <strong className="font-medium">Mercado Pago não conectado.</strong> Adicione <code>MP_ACCESS_TOKEN</code> no arquivo <code>.env.local</code> para
-                receber PIX automático e cartão de crédito. Enquanto isso, use a chave PIX própria ou o modo simulação.
+                <strong className="font-medium">InfinitePay não conectada.</strong> Defina <code>INFINITEPAY_HANDLE</code> (sua InfiniteTag) nas variáveis do
+                site para receber PIX e cartão online. Enquanto isso, só funciona a chave PIX própria
+                {paymentSimulationAllowed() ? " (e o modo simulação, ligado neste computador de testes)" : ""}.
               </>
             )}
           </div>
         </div>
         <ActionForm action={saveSettingsAction.bind(null, "payments")}>
-          <PaymentSettingsFields s={s} mpConfigured={mp} />
+          <PaymentSettingsFields
+            s={s}
+            gateway={gateway ? GATEWAY_LABEL[gateway] : null}
+            simulation={paymentSimulationAllowed()}
+            infinitePayKey={infinitePayHasApiKey()}
+          />
           <SubmitButton className="btn btn-primary btn-sm mt-6">Salvar pagamentos</SubmitButton>
         </ActionForm>
       </Section>

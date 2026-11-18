@@ -51,8 +51,8 @@ export function LoginFlow() {
         className="space-y-4"
       >
         <p className="rounded-2xl bg-lavender-50 px-4 py-3 text-sm text-plum-700">
-          Enviamos um e-mail de acesso para <strong className="font-medium">{sendState.email}</strong>. Toque no link do e-mail (neste mesmo
-          navegador) ou digite o código abaixo. Não chegou? Olhe o spam.
+          Enviamos um e-mail de acesso para <strong className="font-medium">{sendState.email}</strong>. Toque no botão do e-mail ou digite o
+          código de 6 dígitos abaixo. Não chegou? Olhe o spam e a aba Promoções.
         </p>
         <input type="hidden" name="email" value={sendState.email} />
         <div>

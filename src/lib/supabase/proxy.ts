@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { supabaseEnv } from "@/lib/env";
 
 /**
  * Renova a sessão da cliente (tokens expiram em 1h) a cada navegação.
@@ -7,8 +8,7 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 export async function refreshClientSession(request: NextRequest) {
   let response = NextResponse.next({ request });
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const { url, key } = supabaseEnv();
   if (!url || !key || !request.cookies.getAll().some((c) => c.name.startsWith("sb-"))) return response;
 
   const supabase = createServerClient(url, key, {

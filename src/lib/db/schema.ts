@@ -100,7 +100,7 @@ export const appointments = pgTable(
 
 export type PaymentStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" | "EXPIRED";
 export type PaymentMethod = "PIX" | "CARD" | "CASH" | "OTHER";
-export type PaymentProvider = "mercadopago" | "pix_manual" | "simulated" | "studio";
+export type PaymentProvider = "infinitepay" | "mercadopago" | "pix_manual" | "simulated" | "studio";
 
 export const payments = pgTable(
   "payments",
@@ -151,6 +151,8 @@ export const settings = pgTable("settings", {
   pixReceiverName: text("pix_receiver_name").notNull().default(""),
   pixReceiverCity: text("pix_receiver_city").notNull().default(""),
   maxInstallments: integer("max_installments").notNull().default(3),
+  /** InfinitePay: até quantas parcelas o studio assume a taxa do cartão (0 = a cliente paga a taxa sempre). */
+  cardFeeAbsorbedUpTo: integer("card_fee_absorbed_up_to").notNull().default(0),
 
   slotIntervalMin: integer("slot_interval_min").notNull().default(30),
   bookingWindowDays: integer("booking_window_days").notNull().default(60),
@@ -165,6 +167,7 @@ export const settings = pgTable("settings", {
     ),
 }).enableRLS();
 
+export type Admin = typeof admins.$inferSelect;
 export type Service = typeof services.$inferSelect;
 export type Appointment = typeof appointments.$inferSelect;
 export type Payment = typeof payments.$inferSelect;

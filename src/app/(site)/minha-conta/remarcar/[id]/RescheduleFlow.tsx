@@ -5,7 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 import { rescheduleMyAppointmentAction } from "@/app/(site)/minha-conta/actions";
 import { Calendar, type DayStatus } from "@/components/booking/Calendar";
-import { addMonths, formatDateLong, minToTime } from "@/lib/time";
+import { addMonths, formatDateLong, minToTime, STUDIO_TZ_LABEL } from "@/lib/time";
 
 export function RescheduleFlow({ appointmentId, serviceId, today }: { appointmentId: string; serviceId: string; today: string }) {
   const router = useRouter();
@@ -85,7 +85,8 @@ export function RescheduleFlow({ appointmentId, serviceId, today }: { appointmen
         />
       </div>
       <div className="md:border-l md:border-lavender-100 md:pl-8">
-        <h2 className="mb-5 font-display text-3xl">Novo horário</h2>
+        <h2 className="font-display text-3xl">Novo horário</h2>
+        <p className="mb-5 text-xs text-plum-600/60">Horários no {STUDIO_TZ_LABEL}.</p>
         {!date ? (
           <p className="text-sm text-plum-600/70">Escolha um dia disponível.</p>
         ) : slots == null ? (

@@ -3,7 +3,7 @@ import { asc, eq } from "drizzle-orm";
 import { BookingFlow } from "@/components/booking/BookingFlow";
 import { db, services } from "@/lib/db";
 import { clientProfile, getClientUser } from "@/lib/client-auth";
-import { getSettings, mercadoPagoConfigured, publicSettings } from "@/lib/settings";
+import { availableMethods, getSettings, publicSettings } from "@/lib/settings";
 import { todayInStudio } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -23,10 +23,7 @@ export default async function AgendarPage({ searchParams }: { searchParams: Prom
   const client = await getClientUser();
   const prefill = client ? { ...(await clientProfile(client)), email: client.email } : null;
 
-  const simulation =
-    s.chargeMode !== "none" &&
-    !mercadoPagoConfigured() &&
-    (s.cardEnabled || (s.pixEnabled && !(s.pixProvider === "manual" && s.pixKey)));
+  const simulation = s.chargeMode !== "none" && availableMethods(s).simulation;
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">

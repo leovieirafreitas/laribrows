@@ -3,24 +3,33 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import QRCode from "qrcode";
-import { CalendarPlus, CheckCircle2, Clock, CreditCard, Hourglass, MapPin, MessageCircle, QrCode, XCircle } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Clock, CreditCard, Hourglass, MapPin, MessageCircle, QrCode, ShieldCheck, XCircle } from "lucide-react";
 import { markPixSentAction, switchMethodAction } from "./actions";
 import { Ornament } from "@/components/brand/Ornament";
 import { Countdown, PaymentPoller } from "@/components/booking/PaymentWatch";
 import { StatusBadge } from "@/components/ui";
 import { CopyButton, SubmitButton } from "@/components/ui/client";
-import { isHoldExpired, refreshPendingPayment, syncMercadoPagoPayment } from "@/lib/booking";
+import { isHoldExpired, refreshPendingPayment, syncInfinitePayPayment, syncMercadoPagoPayment } from "@/lib/booking";
 import { appointments, db, payments, type Appointment } from "@/lib/db";
 import { formatBRL, whatsappLink } from "@/lib/format";
-import { getSettings } from "@/lib/settings";
-import { formatDateLong, minToTime, studioToDate } from "@/lib/time";
+import { availableMethods, cardFeeText, getSettings, paymentSimulationAllowed } from "@/lib/settings";
+import { formatDateLong, minToTime, studioToDate, STUDIO_TZ_LABEL } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Seu agendamento", robots: { index: false } };
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ payment_id?: string; collection_id?: string; status?: string }>;
+  searchParams: Promise<{
+    // retorno do Mercado Pago
+    payment_id?: string;
+    collection_id?: string;
+    status?: string;
+    // retorno da InfinitePay
+    order_nsu?: string;
+    transaction_nsu?: string;
+    slug?: string;
+  }>;
 };
 
 export default async function AgendamentoPage({ params, searchParams }: Props) {
@@ -31,6 +40,10 @@ export default async function AgendamentoPage({ params, searchParams }: Props) {
   const mpPaymentId = sp.payment_id || sp.collection_id;
   if (mpPaymentId && mpPaymentId !== "null") {
     await syncMercadoPagoPayment(mpPaymentId).catch((e) => console.error(e));
+  }
+  // Retorno da InfinitePay: os dados vêm do navegador, então confirmamos com a InfinitePay.
+  if (sp.order_nsu && sp.transaction_nsu && sp.slug) {
+    await syncInfinitePayPayment({ orderNsu: sp.order_nsu, transactionNsu: sp.transaction_nsu, slug: sp.slug }).catch((e) => console.error(e));
   }
 
   let appt = await db.query.appointments.findFirst({ where: eq(appointments.id, id) });
@@ -113,27 +126,40 @@ export default async function AgendamentoPage({ params, searchParams }: Props) {
               Aguardando pagamento — esta página atualiza sozinha.
             </p>
           )}
-          {payment.provider === "simulated" && <SimulateBox paymentId={payment.id} />}
-          {s.cardEnabled && <SwitchMethod appointmentId={appt.id} method="CARD" />}
+          {payment.provider === "simulated" && paymentSimulationAllowed() && <SimulateBox paymentId={payment.id} />}
+          {availableMethods(s).card && <SwitchMethod appointmentId={appt.id} method="CARD" />}
         </section>
       )}
 
-      {/* Cartão aguardando */}
-      {appt.status === "PENDING_PAYMENT" && payment?.method === "CARD" && (
+      {/* Pagamento numa página externa: InfinitePay (PIX ou cartão) ou cartão no Mercado Pago */}
+      {appt.status === "PENDING_PAYMENT" && payment?.checkoutUrl && !payment.pixCode && (
         <section className="card mt-10 p-6 text-center sm:p-10">
-          <CreditCard className="mx-auto size-8 text-lavender-600" />
-          <p className="mt-3 font-display text-3xl">Finalize o pagamento no cartão</p>
+          {payment.provider === "infinitepay" ? <ShieldCheck className="mx-auto size-8 text-lavender-600" /> : <CreditCard className="mx-auto size-8 text-lavender-600" />}
+          <p className="mt-3 font-display text-3xl">{payment.provider === "infinitepay" ? "Finalize o pagamento" : "Finalize o pagamento no cartão"}</p>
           <p className="mt-2 text-sm text-plum-700/80">
             {payment.status === "REJECTED" || sp.status === "rejected" || sp.status === "failure"
-              ? "O pagamento não foi aprovado. Você pode tentar novamente ou pagar com PIX."
-              : "Seu horário está reservado. Conclua o pagamento para confirmar."}
+              ? "O pagamento não foi aprovado. Você pode tentar novamente."
+              : sp.order_nsu
+                ? "Estamos confirmando seu pagamento — esta página atualiza sozinha em instantes."
+                : "Seu horário está reservado. Conclua o pagamento para confirmar."}
           </p>
           <p className="mt-4 font-display text-4xl">{formatBRL(payment.amountCents)}</p>
           <div className="mt-6 flex flex-col items-center gap-3">
-            {payment.checkoutUrl && (
-              <a href={payment.checkoutUrl} className="btn btn-primary">
-                <CreditCard className="size-4" /> Pagar com cartão
-              </a>
+            <a href={payment.checkoutUrl} className="btn btn-primary">
+              {payment.provider === "infinitepay" ? (
+                <>
+                  <QrCode className="size-4" /> Pagar com PIX ou cartão
+                </>
+              ) : (
+                <>
+                  <CreditCard className="size-4" /> Pagar com cartão
+                </>
+              )}
+            </a>
+            {payment.provider === "infinitepay" && (
+              <p className="max-w-xs text-xs leading-relaxed text-plum-600/60">
+                Pagamento seguro pela InfinitePay. {cardFeeText(s.cardFeeAbsorbedUpTo).long}
+              </p>
             )}
             {appt.expiresAt && (
               <p className="flex items-center gap-1.5 text-sm text-plum-600/80">
@@ -141,7 +167,10 @@ export default async function AgendamentoPage({ params, searchParams }: Props) {
               </p>
             )}
           </div>
-          {s.pixEnabled && <SwitchMethod appointmentId={appt.id} method="PIX" />}
+          {/* Na InfinitePay a cliente já escolhe PIX ou cartão; só oferecemos o PIX direto do studio, se existir. */}
+          {availableMethods(s).pix && (payment.provider !== "infinitepay" || (s.pixProvider === "manual" && s.pixKey)) && (
+            <SwitchMethod appointmentId={appt.id} method="PIX" />
+          )}
         </section>
       )}
 
@@ -149,7 +178,7 @@ export default async function AgendamentoPage({ params, searchParams }: Props) {
       <section className="card mt-8 overflow-hidden">
         <div className="grid gap-6 p-6 sm:grid-cols-2 sm:p-8">
           <Detail label="Procedimento" value={appt.serviceName} />
-          <Detail label="Quando" value={<span>{formatDateLong(appt.date)}, às {minToTime(appt.startMin)}</span>} />
+          <Detail label="Quando" value={<span>{formatDateLong(appt.date)}, às {minToTime(appt.startMin)} <span className="text-sm text-plum-600/60">({STUDIO_TZ_LABEL})</span></span>} />
           <Detail label="Valor do procedimento" value={formatBRL(appt.totalCents)} />
           <Detail
             label={appt.paidCents > 0 ? "Pago" : appt.dueNowCents > 0 ? "A pagar agora" : "Pagamento"}

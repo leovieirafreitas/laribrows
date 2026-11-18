@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { loginAction } from "./actions";
 import { SubmitButton } from "@/components/ui/client";
@@ -13,7 +14,12 @@ export function LoginForm() {
         <input id="email" name="email" type="email" required autoComplete="username" defaultValue={state?.email} key={state?.email} className="field" />
       </div>
       <div>
-        <label className="label" htmlFor="password">Senha</label>
+        <div className="flex items-baseline justify-between gap-3">
+          <label className="label" htmlFor="password">Senha</label>
+          <Link href="/admin/login/esqueci-senha" className="mb-1.5 text-xs text-lavender-600 underline-offset-4 hover:text-plum-900 hover:underline">
+            Esqueci minha senha
+          </Link>
+        </div>
         <input id="password" name="password" type="password" required autoComplete="current-password" className="field" />
       </div>
       {state?.error && <p className="rounded-2xl bg-rose-50 px-4 py-2.5 text-sm text-rose-700">{state.error}</p>}

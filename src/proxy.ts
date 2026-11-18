@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { siteUrl } from "@/lib/env";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
 import { refreshClientSession } from "@/lib/supabase/proxy";
 
@@ -9,7 +10,7 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith("/admin")) {
     if (pathname.startsWith("/admin/login")) return NextResponse.next();
     const session = await verifySession(request.cookies.get(SESSION_COOKIE)?.value);
-    if (!session) return NextResponse.redirect(new URL("/admin/login", request.url));
+    if (!session) return NextResponse.redirect(new URL("/admin/login", siteUrl()));
     return NextResponse.next();
   }
 

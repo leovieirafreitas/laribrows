@@ -1,0 +1,13 @@
+# Não vai para dentro da imagem
+.git
+.next
+node_modules
+data
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.vercel
+larissa-studio-alta-qualidade.jpg
+README.md
