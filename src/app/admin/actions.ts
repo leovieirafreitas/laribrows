@@ -11,6 +11,7 @@ import { admins, appointments, dateOverrides, db, payments, services, settings, 
 import { parseBRL } from "@/lib/format";
 import { getSettings, invalidateSettingsCache } from "@/lib/settings";
 import { addDays, dayIndex, isValidDate, timeToMin } from "@/lib/time";
+import { notifyConfirmed, notifyRescheduled } from "@/lib/whatsapp-notify";
 
 export type ActionState = { ok: boolean; message: string } | null;
 
@@ -39,8 +40,11 @@ export async function confirmPendingPaymentAction(appointmentId: string) {
     where: and(eq(payments.appointmentId, appointmentId), eq(payments.status, "PENDING")),
     orderBy: desc(payments.createdAt),
   });
-  if (p) await approvePayment(p.id);
-  else await db.update(appointments).set({ status: "CONFIRMED", expiresAt: null }).where(eq(appointments.id, appointmentId));
+  if (p) await approvePayment(p.id, { alertStudio: false });
+  else {
+    await db.update(appointments).set({ status: "CONFIRMED", expiresAt: null }).where(eq(appointments.id, appointmentId));
+    notifyConfirmed(appointmentId, { alertStudio: false });
+  }
   refreshAdmin();
 }
 
@@ -110,6 +114,8 @@ export async function rescheduleAction(appointmentId: string, _prev: ActionState
     return { ok: false, message: "Já existe um atendimento nesse horário. Marque “encaixar mesmo assim” para forçar." };
   }
   await db.update(appointments).set({ date, startMin: start, endMin: start + duration }).where(eq(appointments.id, appointmentId));
+  if (bool(fd, "notifyClient")) notifyRescheduled(appointmentId, { byClient: false, before: { date: appt.date, startMin: appt.startMin } });
+  else await db.update(appointments).set({ waReminderSentAt: null }).where(eq(appointments.id, appointmentId)); // novo lembrete
   refreshAdmin();
   return { ok: true, message: "Agendamento remarcado." };
 }
@@ -178,6 +184,7 @@ export async function createManualAppointmentAction(_prev: ActionState, fd: Form
       .returning();
     await approvePayment(p.id);
   }
+  if (bool(fd, "notifyClient")) notifyConfirmed(appt.id, { alertStudio: false });
   refreshAdmin();
   redirect(`/admin/agendamentos/${appt.id}`);
 }

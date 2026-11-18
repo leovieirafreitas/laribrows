@@ -19,6 +19,7 @@ import { centsToInput, formatBRL, formatDuration, whatsappLink } from "@/lib/for
 import { getSettings } from "@/lib/settings";
 import { METHOD_LABEL, PAYMENT_STATUS_LABEL, PROVIDER_LABEL } from "@/lib/status";
 import { formatDateLong, formatStudioDateTime, minToTime } from "@/lib/time";
+import { whatsappConfigured } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Agendamento" };
@@ -144,9 +145,14 @@ export default async function AgendamentoAdminPage({ params }: { params: Promise
                   </div>
                   <SubmitButton className="btn btn-soft">Remarcar</SubmitButton>
                 </div>
-                <label className="mt-3 flex items-center gap-2 text-xs text-plum-600/80">
-                  <input type="checkbox" name="force" className="accent-plum-900" /> Encaixar mesmo se houver conflito
-                </label>
+                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+                  <label className="flex items-center gap-2 text-xs text-plum-600/80">
+                    <input type="checkbox" name="notifyClient" defaultChecked={whatsappConfigured()} className="accent-plum-900" /> Avisar a cliente no WhatsApp
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-plum-600/80">
+                    <input type="checkbox" name="force" className="accent-plum-900" /> Encaixar mesmo se houver conflito
+                  </label>
+                </div>
               </ActionForm>
             )}
           </section>

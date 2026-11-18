@@ -4,6 +4,7 @@ import { computeSlots, loadScheduleContext } from "@/lib/availability";
 import { appointments, db, payments, type Appointment, type Settings } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { formatDateShort, formatStudioDateTime, minToTime, studioToDate } from "@/lib/time";
+import { notifyCancelledByClient, notifyRescheduled } from "@/lib/whatsapp-notify";
 
 export class ClientActionError extends Error {}
 
@@ -51,6 +52,7 @@ export async function cancelByClient(id: string, email: string) {
     .update(payments)
     .set({ status: "CANCELLED" })
     .where(and(eq(payments.appointmentId, a.id), eq(payments.status, "PENDING")));
+  notifyCancelledByClient(a.id);
 }
 
 export async function rescheduleByClient(id: string, email: string, date: string, startMin: number) {
@@ -78,4 +80,5 @@ export async function rescheduleByClient(id: string, email: string, date: string
       })
       .where(eq(appointments.id, a.id));
   });
+  notifyRescheduled(a.id, { byClient: true, before: { date: a.date, startMin: a.startMin } });
 }

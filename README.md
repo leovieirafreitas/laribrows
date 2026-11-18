@@ -83,6 +83,15 @@ O banco de produção é o Postgres do Supabase (projeto `upulfsocjkboblonpdea`)
 - URL Configuration: Site URL = `https://laribrows.com.br`; Redirect URLs liberadas para `laribrows.com.br`, `www.laribrows.com.br` e `localhost:3000`.
 - Limite: 60 e-mails/hora no Supabase (e 100/dia no plano grátis do Resend).
 
+### WhatsApp (Evolution API)
+
+- Painel → **WhatsApp**: status da conexão, QR Code para conectar, desconectar, mensagem de teste e histórico de envios.
+- Mensagens automáticas (com textos editáveis e prévia): **confirmação** para a cliente quando o horário é confirmado ou remarcado,
+  **lembrete** ~24h antes e **avisos para o studio** (novo agendamento, cancelamento e remarcação feitos pela cliente).
+- Cada confirmação/lembrete é enviado uma vez só (`wa_confirm_sent_at` / `wa_reminder_sent_at`). Os lembretes rodam a cada 5 min
+  dentro do próprio servidor (`src/instrumentation.ts`).
+- Use o **token da instância** em `EVOLUTION_API_KEY` — a chave geral do servidor Evolution não é necessária.
+
 ## Publicando (produção)
 
 O site roda em qualquer servidor com Docker (`Dockerfile` na raiz, saída `standalone` do Next.js).
@@ -112,6 +121,7 @@ As variáveis `NEXT_PUBLIC_*` são lidas quando o servidor roda (`src/lib/env.ts
 | `EMAIL_FROM` | `Lari Brows <larissa@laribrows.com.br>` |
 | `INFINITEPAY_HANDLE` | sua InfiniteTag (sem `$`) |
 | `INFINITEPAY_API_KEY` | recomendada: tira a etapa de endereço de entrega e faz o link expirar com a reserva |
+| `EVOLUTION_API_URL` / `EVOLUTION_INSTANCE` / `EVOLUTION_API_KEY` | WhatsApp pela Evolution API (token da instância) |
 | `ALLOW_PAYMENT_SIMULATION` | **não defina** (ou `false`) |
 
 Também funciona na **Vercel** (importe o repositório e cadastre as mesmas variáveis; o `vercel.json` coloca o servidor em `iad1`, perto do banco em Ohio).

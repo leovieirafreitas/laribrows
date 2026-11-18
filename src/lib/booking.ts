@@ -8,6 +8,7 @@ import { buildPixCode } from "@/lib/payments/pix-brcode";
 import * as infinitepay from "@/lib/payments/infinitepay";
 import * as mercadopago from "@/lib/payments/mercadopago";
 import { formatDateShort, minToTime } from "@/lib/time";
+import { notifyConfirmed } from "@/lib/whatsapp-notify";
 
 export class BookingError extends Error {}
 
@@ -91,7 +92,10 @@ export async function createBooking(input: CreateBookingInput) {
     return row;
   });
 
-  if (!needsPayment) return { appointment, redirectTo: `/agendamento/${appointment.id}` };
+  if (!needsPayment) {
+    notifyConfirmed(appointment.id, { alertStudio: true });
+    return { appointment, redirectTo: `/agendamento/${appointment.id}` };
+  }
 
   try {
     const payment = await createPayment(s, appointment, input.method!, dueNow);
@@ -216,8 +220,9 @@ export async function createPayment(s: Settings, appt: Appointment, method: "PIX
 }
 
 /** Marca um pagamento como aprovado e confirma a reserva (idempotente). */
-export async function approvePayment(paymentId: string, opts?: { providerRef?: string }) {
-  return db.transaction(async (tx) => {
+export async function approvePayment(paymentId: string, opts?: { providerRef?: string; alertStudio?: boolean }) {
+  let confirmedId: string | null = null;
+  const result = await db.transaction(async (tx) => {
     const p = await tx.query.payments.findFirst({ where: eq(payments.id, paymentId) });
     if (!p || p.status === "APPROVED") return p;
     await tx
@@ -250,10 +255,14 @@ export async function approvePayment(paymentId: string, opts?: { providerRef?: s
       }
       patch.status = "CONFIRMED";
       patch.expiresAt = null;
+      confirmedId = appt.id;
     }
     await tx.update(appointments).set(patch).where(eq(appointments.id, appt.id));
     return p;
   });
+  // WhatsApp: confirmação para a cliente (+ aviso ao studio), depois de gravar.
+  if (confirmedId) notifyConfirmed(confirmedId, { alertStudio: opts?.alertStudio ?? true });
+  return result;
 }
 
 export async function rejectPayment(paymentId: string, status: "REJECTED" | "CANCELLED" = "REJECTED") {

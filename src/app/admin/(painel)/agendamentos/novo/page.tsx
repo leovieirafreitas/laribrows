@@ -9,6 +9,7 @@ import { DateField, SelectField, TimeField } from "@/components/ui/pickers";
 import { db, services } from "@/lib/db";
 import { formatBRL } from "@/lib/format";
 import { todayInStudio } from "@/lib/time";
+import { whatsappConfigured } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Novo agendamento" };
@@ -86,6 +87,9 @@ export default async function NovoAgendamentoPage({
           <label className="label">Anotações internas</label>
           <textarea name="adminNotes" rows={3} className="field resize-none" />
         </div>
+        <label className="flex items-center gap-2 text-sm text-plum-700">
+          <input type="checkbox" name="notifyClient" defaultChecked={whatsappConfigured()} className="accent-plum-900" /> Enviar confirmação no WhatsApp da cliente
+        </label>
         <label className="flex items-center gap-2 text-sm text-plum-700">
           <input type="checkbox" name="force" className="accent-plum-900" /> Encaixar mesmo se houver conflito de horário
         </label>

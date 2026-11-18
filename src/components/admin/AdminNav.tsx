@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { CalendarDays, ClipboardList, Clock4, ExternalLink, LayoutDashboard, LogOut, Menu, Settings2, Sparkles, Users, X } from "lucide-react";
+import { CalendarDays, ClipboardList, Clock4, ExternalLink, LayoutDashboard, LogOut, Menu, MessageCircle, Settings2, Sparkles, Users, X } from "lucide-react";
 import { logoutAction } from "@/app/admin/login/actions";
 import { Logo } from "@/components/brand/Logo";
 
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/admin/clientes", label: "Clientes", icon: Users },
   { href: "/admin/procedimentos", label: "Procedimentos", icon: Sparkles },
   { href: "/admin/horarios", label: "Horários e bloqueios", icon: Clock4 },
+  { href: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/admin/configuracoes", label: "Configurações", icon: Settings2 },
 ];
 

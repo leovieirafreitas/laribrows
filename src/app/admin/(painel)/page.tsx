@@ -6,6 +6,7 @@ import { RevenueChart } from "@/components/admin/RevenueChart";
 import { SubmitButton } from "@/components/ui/client";
 import { getDashboardData } from "@/lib/admin-data";
 import { getClientStats } from "@/lib/clients";
+import { getWhatsappStatus } from "@/lib/whatsapp";
 import { formatBRL } from "@/lib/format";
 import { availableMethods, getSettings } from "@/lib/settings";
 import { formatDateCompact, formatDateLong, minToTime } from "@/lib/time";
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ senha?: string }> }) {
-  const [d, s, { senha }, clients] = await Promise.all([getDashboardData(), getSettings(), searchParams, getClientStats()]);
+  const [d, s, { senha }, clients, wa] = await Promise.all([getDashboardData(), getSettings(), searchParams, getClientStats(), getWhatsappStatus(3_000)]);
   const methods = availableMethods(s);
   const paymentWarning = s.chargeMode !== "none" && (methods.simulation || methods.missingSetup);
   const hour = Math.floor(d.nowMinutes / 60);
@@ -33,6 +34,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <CircleCheck className="size-4 shrink-0 text-lavender-600" />
           <p>
             <strong className="font-medium">Senha redefinida.</strong> Da próxima vez, entre com a senha nova.
+          </p>
+        </div>
+      )}
+
+      {(wa.state === "close" || wa.state === "connecting" || wa.state === "erro") && (
+        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-champagne-300 bg-champagne-200/50 px-5 py-4 text-sm text-champagne-600">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <p>
+            <strong className="font-medium">WhatsApp desconectado.</strong> Confirmações e lembretes automáticos estão pausados.{" "}
+            <Link href="/admin/whatsapp" className="underline">
+              Conectar agora
+            </Link>
+            .
           </p>
         </div>
       )}

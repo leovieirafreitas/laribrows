@@ -89,6 +89,9 @@ export const appointments = pgTable(
     paidCents: integer("paid_cents").notNull().default(0),
     expiresAt: ts("expires_at"),
     adminNotes: text("admin_notes").notNull().default(""),
+    /** WhatsApp: quando a confirmação e o lembrete foram enviados (evita mandar duas vezes). */
+    waConfirmSentAt: ts("wa_confirm_sent_at"),
+    waReminderSentAt: ts("wa_reminder_sent_at"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -165,9 +168,34 @@ export const settings = pgTable("settings", {
     .default(
       "O sinal garante o seu horário e é abatido no valor do procedimento. Remarcações com até 24h de antecedência. Em caso de falta sem aviso, o sinal não é devolvido.",
     ),
+
+  /* WhatsApp (Evolution API). Textos vazios = modelo padrão do sistema. */
+  waConfirmEnabled: boolean("wa_confirm_enabled").notNull().default(true),
+  waConfirmTemplate: text("wa_confirm_template").notNull().default(""),
+  waReminderEnabled: boolean("wa_reminder_enabled").notNull().default(true),
+  waReminderTemplate: text("wa_reminder_template").notNull().default(""),
+  /** Avisos para o próprio studio: novo agendamento, cancelamento e remarcação feitos pela cliente. */
+  waStudioAlerts: boolean("wa_studio_alerts").notNull().default(true),
 }).enableRLS();
 
+/** Histórico de mensagens de WhatsApp enviadas pelo sistema. */
+export const whatsappMessages = pgTable(
+  "whatsapp_messages",
+  {
+    id: id(),
+    appointmentId: text("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
+    toNumber: text("to_number").notNull(),
+    kind: text("kind").$type<"confirmacao" | "lembrete" | "studio" | "teste">().notNull(),
+    status: text("status").$type<"enviada" | "falhou">().notNull(),
+    error: text("error").notNull().default(""),
+    preview: text("preview").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (t) => [index("whatsapp_messages_created_idx").on(t.createdAt)],
+).enableRLS();
+
 export type Admin = typeof admins.$inferSelect;
+export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
 export type Service = typeof services.$inferSelect;
 export type Appointment = typeof appointments.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
