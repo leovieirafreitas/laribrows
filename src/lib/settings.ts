@@ -2,6 +2,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { db, settings, type Settings } from "@/lib/db";
 import { infinitePayConfigured } from "@/lib/payments/infinitepay";
+import { depositCents } from "@/lib/pricing";
 
 async function loadSettings(): Promise<Settings> {
   const row = await db.query.settings.findFirst({ where: eq(settings.id, 1) });
@@ -81,8 +82,7 @@ export function computeDueNow(s: Settings, totalCents: number, payOption: "DEPOS
   if (s.chargeMode === "none") return 0;
   if (s.chargeMode === "full") return totalCents;
   if (payOption === "FULL" && s.allowFullPayment) return totalCents;
-  const pct = Math.min(100, Math.max(1, s.depositPercent));
-  return Math.round((totalCents * pct) / 100);
+  return depositCents(totalCents, s.depositPercent);
 }
 
 /**
@@ -112,6 +112,8 @@ export function publicSettings(s: Settings) {
     maxInstallments: s.maxInstallments,
     /** Textos curtos das opções de pagamento. */
     cardHint: onlineGateway() === "infinitepay" ? cardFeeText(s.cardFeeAbsorbedUpTo).short : s.maxInstallments > 1 ? `Em até ${s.maxInstallments}x` : "À vista",
+    /** Aviso antes de ir para a página de pagamento externa (a InfinitePay só volta ao site com "Continuar"). */
+    checkoutNote: onlineGateway() === "infinitepay" ? "Você vai para a página segura da InfinitePay. Depois de pagar, toque em “Continuar” na tela da InfinitePay para voltar ao site com o horário confirmado." : "",
     pixHint: onlineGateway() === "infinitepay" && s.cardFeeAbsorbedUpTo < 12 ? "Sem acréscimo · aprovação na hora" : "Aprovação na hora",
     cancellationPolicy: s.cancellationPolicy,
   };

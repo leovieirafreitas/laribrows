@@ -2,6 +2,7 @@ import "server-only";
 import { and, eq, gt, inArray, lt, ne, sql } from "drizzle-orm";
 import { appointments, db, payments, services, type Appointment, type Payment, type Settings } from "@/lib/db";
 import { BLOCKING_STATUSES, computeSlots, loadScheduleContext } from "@/lib/availability";
+import { MIN_ONLINE_CENTS } from "@/lib/pricing";
 import { availableMethods, computeDueNow, getSettings, mercadoPagoConfigured, paymentSimulationAllowed, siteUrl } from "@/lib/settings";
 import { buildPixCode } from "@/lib/payments/pix-brcode";
 import * as infinitepay from "@/lib/payments/infinitepay";
@@ -46,6 +47,9 @@ export async function createBooking(input: CreateBookingInput) {
 
   const dueNow = computeDueNow(s, service.priceCents, input.payOption);
   const needsPayment = dueNow > 0;
+  if (needsPayment && dueNow < MIN_ONLINE_CENTS) {
+    throw new BookingError("O pagamento online é a partir de R$ 1,00. Fale com o studio pelo WhatsApp para agendar.");
+  }
   if (needsPayment) {
     if (!input.method) throw new BookingError("Escolha a forma de pagamento.");
     const methods = availableMethods(s);

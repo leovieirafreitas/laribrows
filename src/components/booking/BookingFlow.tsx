@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, Check, Clock, CreditCard, Loader2, QrCode, Shiel
 import { createBookingAction } from "@/app/(site)/agendar/actions";
 import { Calendar, type DayStatus } from "@/components/booking/Calendar";
 import { formatBRL, formatDuration, formatPhone } from "@/lib/format";
+import { depositCents } from "@/lib/pricing";
 import type { PublicSettings } from "@/lib/settings";
 import { addMonths, formatDateLong, minToTime, STUDIO_TZ_LABEL } from "@/lib/time";
 
@@ -98,7 +99,7 @@ export function BookingFlow({
     if (s.chargeMode === "none") return 0;
     if (s.chargeMode === "full") return service.priceCents;
     if (payOption === "FULL" && s.allowFullPayment) return service.priceCents;
-    return Math.round((service.priceCents * s.depositPercent) / 100);
+    return depositCents(service.priceCents, s.depositPercent);
   }, [service, s, payOption]);
 
   const groupedSlots = useMemo(() => {
@@ -318,7 +319,7 @@ export function BookingFlow({
                 <div className="mt-6 grid gap-3 sm:grid-cols-2">
                   {(
                     [
-                      ["DEPOSIT", `Sinal de ${s.depositPercent}%`, Math.round((service.priceCents * s.depositPercent) / 100), "Restante no dia"],
+                      ["DEPOSIT", `Sinal de ${s.depositPercent}%`, depositCents(service.priceCents, s.depositPercent), "Restante no dia"],
                       ["FULL", "Valor total", service.priceCents, "Nada a pagar no dia"],
                     ] as const
                   ).map(([key, label, value, hint]) => (
@@ -378,6 +379,13 @@ export function BookingFlow({
                 </p>
               )}
             </div>
+          )}
+
+          {step === 3 && s.chargeMode !== "none" && s.checkoutNote && (
+            <p className="mt-6 flex gap-2.5 text-xs leading-relaxed text-plum-600/80">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-lavender-600" />
+              {s.checkoutNote}
+            </p>
           )}
 
           {error && <p className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}

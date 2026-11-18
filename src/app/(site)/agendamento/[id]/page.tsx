@@ -161,6 +161,9 @@ export default async function AgendamentoPage({ params, searchParams }: Props) {
                 Pagamento seguro pela InfinitePay. {cardFeeText(s.cardFeeAbsorbedUpTo).long}
               </p>
             )}
+            {payment.provider === "infinitepay" && (
+              <p className="max-w-xs rounded-2xl bg-lavender-50 px-4 py-3 text-xs leading-relaxed text-plum-700">Depois de pagar, toque em “Continuar” na tela da InfinitePay para voltar ao site com o horário confirmado.</p>
+            )}
             {appt.expiresAt && (
               <p className="flex items-center gap-1.5 text-sm text-plum-600/80">
                 <Hourglass className="size-4" /> Reservado por <Countdown until={appt.expiresAt.getTime()} />
