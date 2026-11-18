@@ -1,0 +1,94 @@
+import Link from "next/link";
+import { asc } from "drizzle-orm";
+import { ArrowLeft } from "lucide-react";
+import { createManualAppointmentAction } from "@/app/admin/actions";
+import { ActionForm } from "@/components/admin/ActionForm";
+import { PageHeader } from "@/components/admin/AppointmentItem";
+import { SubmitButton } from "@/components/ui/client";
+import { db, services } from "@/lib/db";
+import { formatBRL } from "@/lib/format";
+import { todayInStudio } from "@/lib/time";
+
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Novo agendamento" };
+
+export default async function NovoAgendamentoPage({ searchParams }: { searchParams: Promise<{ data?: string }> }) {
+  const { data } = await searchParams;
+  const list = await db.select().from(services).orderBy(asc(services.sortOrder), asc(services.name));
+
+  return (
+    <div className="mx-auto max-w-3xl">
+      <Link href="/admin/agendamentos" className="mb-4 inline-flex items-center gap-1.5 text-xs tracking-wide text-plum-600/70 hover:text-plum-900">
+        <ArrowLeft className="size-3.5" /> Agendamentos
+      </Link>
+      <PageHeader eyebrow="Lançamento manual" title="Novo agendamento" />
+      <p className="-mt-4 mb-6 text-sm text-plum-600/70">Para clientes que marcaram pelo WhatsApp, Instagram ou no balcão. Entra como confirmado.</p>
+
+      <ActionForm action={createManualAppointmentAction} className="card space-y-5 p-6 sm:p-8">
+        <div>
+          <label className="label">Procedimento</label>
+          <select name="serviceId" required className="field">
+            {list.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} — {formatBRL(s.priceCents)} ({s.durationMin} min){s.active ? "" : " · inativo"}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label">Data</label>
+            <input type="date" name="date" required defaultValue={data ?? todayInStudio()} className="field" />
+          </div>
+          <div>
+            <label className="label">Horário</label>
+            <input type="time" name="time" required step={300} defaultValue="09:00" className="field" />
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="label">Nome da cliente</label>
+            <input name="clientName" required className="field" />
+          </div>
+          <div>
+            <label className="label">WhatsApp</label>
+            <input name="clientPhone" required className="field" inputMode="tel" placeholder="(11) 98765-4321" />
+          </div>
+          <div>
+            <label className="label">E-mail (opcional)</label>
+            <input name="clientEmail" type="email" className="field" />
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label className="label">Valor cobrado (R$)</label>
+            <input name="price" className="field" inputMode="decimal" placeholder="Valor do procedimento" />
+          </div>
+          <div>
+            <label className="label">Já recebeu (R$)</label>
+            <input name="paid" className="field" inputMode="decimal" placeholder="0,00" />
+          </div>
+          <div>
+            <label className="label">Forma</label>
+            <select name="method" className="field" defaultValue="PIX">
+              <option value="PIX">PIX</option>
+              <option value="CARD">Cartão</option>
+              <option value="CASH">Dinheiro</option>
+              <option value="OTHER">Outro</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="label">Anotações internas</label>
+          <textarea name="adminNotes" rows={3} className="field resize-none" />
+        </div>
+        <label className="flex items-center gap-2 text-sm text-plum-700">
+          <input type="checkbox" name="force" className="accent-plum-900" /> Encaixar mesmo se houver conflito de horário
+        </label>
+        <SubmitButton className="btn btn-primary" pendingText="Salvando…">
+          Criar agendamento
+        </SubmitButton>
+      </ActionForm>
+    </div>
+  );
+}

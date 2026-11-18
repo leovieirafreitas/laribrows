@@ -1,0 +1,132 @@
+import { asc, gte } from "drizzle-orm";
+import { Trash2 } from "lucide-react";
+import { addOverrideAction, deleteOverrideAction, saveWorkingHoursAction } from "@/app/admin/actions";
+import { ActionForm } from "@/components/admin/ActionForm";
+import { PageHeader } from "@/components/admin/AppointmentItem";
+import { SubmitButton } from "@/components/ui/client";
+import { dateOverrides, db, workingHours } from "@/lib/db";
+import { formatDateCompact, isValidDate, minToTime, todayInStudio, WEEKDAYS_LONG } from "@/lib/time";
+
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Horários e bloqueios" };
+
+export default async function HorariosPage({ searchParams }: { searchParams: Promise<{ abrir?: string }> }) {
+  const { abrir } = await searchParams;
+  const today = todayInStudio();
+  const [hours, overrides] = await Promise.all([
+    db.select().from(workingHours),
+    db.select().from(dateOverrides).where(gte(dateOverrides.date, today)).orderBy(asc(dateOverrides.date)),
+  ]);
+  const byDay = new Map(hours.map((h) => [h.weekday, h]));
+  // Semana começando na segunda
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const openDate = abrir && isValidDate(abrir) ? abrir : "";
+
+  return (
+    <div className="mx-auto max-w-5xl">
+      <PageHeader eyebrow="Disponibilidade" title="Horários e bloqueios" />
+
+      <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
+        <section className="card p-5 sm:p-6">
+          <h2 className="font-display text-2xl">Horário padrão da semana</h2>
+          <p className="mt-1 text-sm text-plum-600/70">Os horários livres do site são gerados a partir daqui.</p>
+          <ActionForm action={saveWorkingHoursAction} className="mt-5">
+            <div className="divide-y divide-lavender-100">
+              {order.map((d) => {
+                const h = byDay.get(d);
+                return (
+                  <div key={d} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 py-3 sm:grid-cols-[9rem_1fr]">
+                    <label className="flex items-center gap-2.5 text-sm font-medium text-plum-800">
+                      <input type="checkbox" name={`open_${d}`} defaultChecked={h?.isOpen ?? false} className="peer size-4 accent-plum-900" />
+                      {WEEKDAYS_LONG[d]}
+                    </label>
+                    <div className="col-span-2 flex flex-wrap items-center gap-2 text-sm sm:col-span-1">
+                      <input type="time" name={`start_${d}`} defaultValue={minToTime(h?.startMin ?? 540)} className="field w-28 px-3 py-2" aria-label="Início" />
+                      <span className="text-plum-600/50">às</span>
+                      <input type="time" name={`end_${d}`} defaultValue={minToTime(h?.endMin ?? 1080)} className="field w-28 px-3 py-2" aria-label="Fim" />
+                      <span className="ml-1 text-xs text-plum-600/50">pausa</span>
+                      <input type="time" name={`break_start_${d}`} defaultValue={h?.breakStartMin != null ? minToTime(h.breakStartMin) : ""} className="field w-28 px-3 py-2" aria-label="Início da pausa" />
+                      <span className="text-plum-600/50">–</span>
+                      <input type="time" name={`break_end_${d}`} defaultValue={h?.breakEndMin != null ? minToTime(h.breakEndMin) : ""} className="field w-28 px-3 py-2" aria-label="Fim da pausa" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-xs text-plum-600/60">Marque os dias em que o studio atende. Deixe a pausa em branco se não houver intervalo.</p>
+            <SubmitButton className="btn btn-primary btn-sm mt-4">Salvar horários</SubmitButton>
+          </ActionForm>
+        </section>
+
+        <div className="space-y-6">
+          <section className="card p-5 sm:p-6">
+            <h2 className="font-display text-2xl">Bloquear ou abrir datas</h2>
+            <p className="mt-1 text-sm text-plum-600/70">Folgas, feriados, férias ou um dia com horário diferente.</p>
+            <ActionForm action={addOverrideAction} resetOnSuccess className="mt-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">De</label>
+                  <input type="date" name="from" required min={today} defaultValue={openDate} className="field" />
+                </div>
+                <div>
+                  <label className="label">Até (opcional)</label>
+                  <input type="date" name="to" min={today} className="field" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-lavender-200 bg-white px-3 py-2.5 text-sm has-checked:border-plum-900 has-checked:bg-lavender-50">
+                  <input type="radio" name="type" value="closed" defaultChecked={!openDate} className="accent-plum-900" /> Fechado
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-lavender-200 bg-white px-3 py-2.5 text-sm has-checked:border-plum-900 has-checked:bg-lavender-50">
+                  <input type="radio" name="type" value="special" defaultChecked={!!openDate} className="accent-plum-900" /> Horário especial
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Início (especial)</label>
+                  <input type="time" name="start" defaultValue="09:00" className="field" />
+                </div>
+                <div>
+                  <label className="label">Fim (especial)</label>
+                  <input type="time" name="end" defaultValue="18:00" className="field" />
+                </div>
+              </div>
+              <div>
+                <label className="label">Motivo (opcional)</label>
+                <input name="note" className="field" placeholder="Ex.: Feriado, curso, férias" />
+              </div>
+              <SubmitButton className="btn btn-primary btn-sm">Salvar</SubmitButton>
+            </ActionForm>
+          </section>
+
+          <section className="card p-5 sm:p-6">
+            <h2 className="font-display text-2xl">Próximas exceções</h2>
+            {overrides.length === 0 ? (
+              <p className="mt-3 text-sm text-plum-600/70">Nenhuma data bloqueada ou especial.</p>
+            ) : (
+              <ul className="mt-3 divide-y divide-lavender-100">
+                {overrides.map((o) => (
+                  <li key={o.date} className="flex items-center gap-3 py-2.5">
+                    <span className={`size-2 rounded-full ${o.isClosed ? "bg-stone-400" : "bg-champagne-500"}`} />
+                    <div className="flex-1 text-sm">
+                      <p className="font-medium text-plum-800">{formatDateCompact(o.date)}</p>
+                      <p className="text-xs text-plum-600/70">
+                        {o.isClosed ? "Fechado" : `Especial ${minToTime(o.startMin ?? 0)}–${minToTime(o.endMin ?? 0)}`}
+                        {o.note ? ` · ${o.note}` : ""}
+                      </p>
+                    </div>
+                    <form action={deleteOverrideAction.bind(null, o.date)}>
+                      <SubmitButton className="grid size-8 cursor-pointer place-items-center rounded-full text-plum-600/50 hover:bg-rose-50 hover:text-rose-600">
+                        <Trash2 className="size-4" />
+                      </SubmitButton>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}

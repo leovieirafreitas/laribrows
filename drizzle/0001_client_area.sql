@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "client_change_hours" integer DEFAULT 24 NOT NULL;

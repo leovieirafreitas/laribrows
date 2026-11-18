@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ivory: #fdfbf8;
+  --color-lavender-50: #faf7fd;
+  --color-lavender-100: #f4eefa;
+  --color-lavender-200: #e9dff5;
+  --color-lavender-300: #d6c5ec;
+  --color-lavender-400: #bba2dd;
+  --color-lavender-500: #9f81cb;
+  --color-lavender-600: #8566b4;
+  --color-lavender-700: #6c5194;
+  --color-plum-600: #5a4672;
+  --color-plum-700: #4a3a60;
+  --color-plum-800: #3a2d4d;
+  --color-plum-900: #2a2039;
+  --color-plum-950: #1c1527;
+  --color-champagne-200: #f1e7d6;
+  --color-champagne-300: #e4d2b2;
+  --color-champagne-400: #d1b68b;
+  --color-champagne-500: #b39568;
+  --color-champagne-600: #92764d;
+
+  --font-display: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  --font-sans: var(--font-jost), "Jost", ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-soft: 0 18px 50px -24px rgb(108 81 148 / 0.35);
+  --shadow-card: 0 1px 2px rgb(42 32 57 / 0.04), 0 12px 32px -18px rgb(108 81 148 / 0.28);
+
+  --animate-fade-up: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-float: float 7s ease-in-out infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-ivory);
+  color: var(--color-plum-900);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-lavender-200);
+  color: var(--color-plum-900);
+}
+
+/* Componentes visuais reutilizáveis (no layer "components": utilitários sobrescrevem) */
+@layer components {
+  .eyebrow {
+    @apply text-[0.68rem] font-medium tracking-[0.32em] text-lavender-700 uppercase;
+  }
+  .display {
+    @apply font-display font-light tracking-tight text-plum-900;
+  }
+  .card {
+    @apply rounded-3xl border border-lavender-200/80 bg-white/80 shadow-card backdrop-blur-sm;
+  }
+  .field {
+    @apply w-full rounded-2xl border border-lavender-200 bg-white px-4 py-3 text-[0.95rem] text-plum-900 transition outline-none placeholder:text-plum-600/40 focus:border-lavender-500 focus:ring-4 focus:ring-lavender-200/60 disabled:opacity-60;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-medium tracking-wide text-plum-700;
+  }
+  /* Botões: use "btn btn-primary", "btn btn-outline btn-sm"... */
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-full px-6 py-3 text-[0.72rem] font-medium tracking-[0.2em] whitespace-nowrap uppercase transition duration-300 disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-plum-900 text-white shadow-soft hover:bg-lavender-700;
+  }
+  .btn-soft {
+    @apply bg-lavender-100 text-plum-800 hover:bg-lavender-200;
+  }
+  .btn-outline {
+    @apply border border-plum-900/15 bg-white/60 text-plum-900 hover:border-lavender-500 hover:bg-white;
+  }
+  .btn-ghost {
+    @apply px-3 text-plum-700 hover:bg-lavender-100;
+  }
+  .btn-danger {
+    @apply border border-rose-200 bg-white text-rose-700 hover:bg-rose-50;
+  }
+  .btn-sm {
+    @apply px-4 py-2 text-[0.65rem];
+  }
+}
+
+/* Ornamento do fundo (manchas suaves de lavanda e champagne) */
+.bg-aura {
+  background:
+    radial-gradient(60rem 40rem at 85% -10%, rgb(214 197 236 / 0.55), transparent 60%),
+    radial-gradient(40rem 30rem at -10% 20%, rgb(241 231 214 / 0.7), transparent 60%),
+    radial-gradient(50rem 40rem at 50% 120%, rgb(233 223 245 / 0.6), transparent 60%),
+    var(--color-ivory);
+}
+
+.hairline {
+  background: linear-gradient(90deg, transparent, var(--color-champagne-400), transparent);
+  height: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
