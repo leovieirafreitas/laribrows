@@ -36,31 +36,44 @@ export async function loadScheduleContext(
   excludeAppointmentId?: string,
   conn: Pick<typeof db, "select"> = db,
 ): Promise<ScheduleContext> {
-  const [hours, overrides, busy] = await Promise.all([
-    conn.select().from(workingHours),
-    conn
-      .select()
-      .from(dateOverrides)
-      .where(and(gte(dateOverrides.date, from), lte(dateOverrides.date, to))),
-    conn
-      .select({
-        id: appointments.id,
-        date: appointments.date,
-        startMin: appointments.startMin,
-        endMin: appointments.endMin,
-        status: appointments.status,
-        expiresAt: appointments.expiresAt,
-      })
-      .from(appointments)
-      .where(
-        and(
-          gte(appointments.date, from),
-          lte(appointments.date, to),
-          inArray(appointments.status, [...BLOCKING_STATUSES]),
-          excludeAppointmentId ? ne(appointments.id, excludeAppointmentId) : undefined,
+  const queries = [
+    () => conn.select().from(workingHours),
+    () =>
+      conn
+        .select()
+        .from(dateOverrides)
+        .where(and(gte(dateOverrides.date, from), lte(dateOverrides.date, to))),
+    () =>
+      conn
+        .select({
+          id: appointments.id,
+          date: appointments.date,
+          startMin: appointments.startMin,
+          endMin: appointments.endMin,
+          status: appointments.status,
+          expiresAt: appointments.expiresAt,
+        })
+        .from(appointments)
+        .where(
+          and(
+            gte(appointments.date, from),
+            lte(appointments.date, to),
+            inArray(appointments.status, [...BLOCKING_STATUSES]),
+            excludeAppointmentId ? ne(appointments.id, excludeAppointmentId) : undefined,
+          ),
         ),
-      ),
-  ]);
+  ] as const;
+  // Fora de transação: em paralelo (uma ida ao banco). Dentro de uma transação a conexão é única,
+  // então as consultas vão em sequência.
+  const inTransaction = conn !== db;
+  let hours, overrides, busy;
+  if (inTransaction) {
+    hours = await queries[0]();
+    overrides = await queries[1]();
+    busy = await queries[2]();
+  } else {
+    [hours, overrides, busy] = await Promise.all([queries[0](), queries[1](), queries[2]()]);
+  }
   const nowMs = Date.now();
   return {
     settings: s,
@@ -133,9 +146,23 @@ export function bookingRange(s: Settings) {
   return { from: today, to: addDays(today, s.bookingWindowDays) };
 }
 
+/**
+ * Marca como EXPIRADAS as reservas que não foram pagas a tempo.
+ * A disponibilidade já ignora reservas vencidas; isto só arruma o status para o painel,
+ * então roda no máximo 1x por minuto (cada consulta ao banco custa caro).
+ */
+const cleanupMemo = globalThis as unknown as { __lbCleanupAt?: number };
 export async function cleanupExpired() {
-  await db
-    .update(appointments)
-    .set({ status: "EXPIRED" })
-    .where(and(eq(appointments.status, "PENDING_PAYMENT"), lte(appointments.expiresAt, new Date())));
+  if (cleanupMemo.__lbCleanupAt && Date.now() - cleanupMemo.__lbCleanupAt < 60_000) return;
+  cleanupMemo.__lbCleanupAt = Date.now();
+  // Arrumação não essencial: uma falha de rede aqui não pode derrubar a página.
+  try {
+    await db
+      .update(appointments)
+      .set({ status: "EXPIRED" })
+      .where(and(eq(appointments.status, "PENDING_PAYMENT"), lte(appointments.expiresAt, new Date())));
+  } catch (err) {
+    cleanupMemo.__lbCleanupAt = 0; // tenta de novo na próxima
+    console.error("[cleanupExpired]", (err as Error).message);
+  }
 }

@@ -16,7 +16,7 @@ const NAV = [
   { href: "/admin/configuracoes", label: "Configurações", icon: Settings2 },
 ];
 
-export function AdminNav({ studioName, adminName, pendingCount }: { studioName: string; adminName: string; pendingCount: number }) {
+export function AdminNav({ studioName, adminName, pendingBadge }: { studioName: string; adminName: string; pendingBadge: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -28,14 +28,13 @@ export function AdminNav({ studioName, adminName, pendingCount }: { studioName: 
           <Link
             key={item.href}
             href={item.href}
+            prefetch // carrega a página inteira em segundo plano: o clique abre na hora
             onClick={() => setOpen(false)}
             className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm transition ${active ? "bg-white text-plum-900 shadow-card" : "text-lavender-100/80 hover:bg-white/10 hover:text-white"}`}
           >
             <item.icon className={`size-4 ${active ? "text-lavender-600" : ""}`} />
             <span className="flex-1">{item.label}</span>
-            {item.href === "/admin/agendamentos" && pendingCount > 0 && (
-              <span className="grid min-w-5 place-items-center rounded-full bg-champagne-400 px-1.5 text-[0.65rem] font-medium text-plum-950">{pendingCount}</span>
-            )}
+            {item.href === "/admin/agendamentos" && pendingBadge}
           </Link>
         );
       })}

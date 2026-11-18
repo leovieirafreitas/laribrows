@@ -1,7 +1,9 @@
+import Image from "next/image";
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { ArrowRight, CalendarHeart, Clock, CreditCard, Sparkles, Wand2 } from "lucide-react";
-import { BrowArt, Ornament } from "@/components/brand/Ornament";
+import { Ornament } from "@/components/brand/Ornament";
+import larissa from "@/assets/larissa.jpg";
 import { SectionTitle } from "@/components/ui";
 import { db, services } from "@/lib/db";
 import { formatBRL, formatDuration } from "@/lib/format";
@@ -53,7 +55,30 @@ export default async function HomePage() {
           </div>
 
           <div className="relative mx-auto w-full max-w-sm animate-fade-up [animation-delay:150ms]">
-            <BrowArt className="w-full drop-shadow-[0_30px_60px_rgba(108,81,148,0.25)]" />
+            {/* Brilho lavanda atrás da foto */}
+            <div className="pointer-events-none absolute -inset-10 rounded-full bg-lavender-300/40 blur-3xl" />
+            {/* Contorno champagne deslocado, no formato do arco */}
+            <div className="pointer-events-none absolute -inset-3 rounded-t-full border border-champagne-400/80" />
+            <div className="relative aspect-[4/5] overflow-hidden rounded-t-full bg-lavender-200 shadow-[0_30px_60px_-20px_rgba(108,81,148,0.45)]">
+              <Image
+                src={larissa}
+                alt={`Larissa, do ${s.studioName}`}
+                fill
+                priority
+                placeholder="blur"
+                sizes="(min-width: 768px) 384px, 90vw"
+                className="object-cover object-[55%_30%]"
+              />
+              {/* Véu lavanda suave na base, para a foto conversar com a paleta do site */}
+              <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-plum-900/35 via-lavender-500/10 to-transparent" />
+            </div>
+            {/* Brilhos dourados */}
+            <svg viewBox="0 0 24 24" className="pointer-events-none absolute -top-2 right-2 size-6 text-champagne-500" aria-hidden>
+              <path d="M12 0l2.6 9.4L24 12l-9.4 2.6L12 24l-2.6-9.4L0 12l9.4-2.6z" fill="currentColor" />
+            </svg>
+            <svg viewBox="0 0 24 24" className="pointer-events-none absolute top-1/3 -right-5 size-3.5 text-champagne-400" aria-hidden>
+              <path d="M12 0l2.6 9.4L24 12l-9.4 2.6L12 24l-2.6-9.4L0 12l9.4-2.6z" fill="currentColor" />
+            </svg>
             <div className="card absolute -bottom-4 -left-6 hidden animate-float items-center gap-3 px-4 py-3 sm:flex">
               <span className="grid size-10 place-items-center rounded-full bg-lavender-100 text-lavender-700">
                 <Sparkles className="size-5" />

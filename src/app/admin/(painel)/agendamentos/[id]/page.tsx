@@ -24,12 +24,13 @@ export const metadata = { title: "Agendamento" };
 
 export default async function AgendamentoAdminPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const a = await db.query.appointments.findFirst({ where: eq(appointments.id, id) });
-  if (!a) notFound();
-  const [pays, s] = await Promise.all([
+  // Tudo em paralelo: uma única ida ao banco.
+  const [a, pays, s] = await Promise.all([
+    db.query.appointments.findFirst({ where: eq(appointments.id, id) }),
     db.select().from(payments).where(eq(payments.appointmentId, id)).orderBy(desc(payments.createdAt)),
     getSettings(),
   ]);
+  if (!a) notFound();
   const remaining = Math.max(0, a.totalCents - a.paidCents);
   const firstName = a.clientName.split(" ")[0];
   const waConfirm = whatsappLink(

@@ -10,8 +10,10 @@ function key() {
   return new TextEncoder().encode(secret);
 }
 
-export async function signSession(adminId: string) {
-  return new SignJWT({ sub: adminId })
+export type AdminSession = { adminId: string; name?: string; email?: string };
+
+export async function signSession(admin: { id: string; name: string; email: string }) {
+  return new SignJWT({ sub: admin.id, name: admin.name, email: admin.email })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_DAYS}d`)
@@ -22,7 +24,11 @@ export async function verifySession(token: string | undefined) {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, key(), { algorithms: ["HS256"] });
-    return typeof payload.sub === "string" ? { adminId: payload.sub } : null;
+    if (typeof payload.sub !== "string") return null;
+    const session: AdminSession = { adminId: payload.sub };
+    if (typeof payload.name === "string") session.name = payload.name;
+    if (typeof payload.email === "string") session.email = payload.email;
+    return session;
   } catch {
     return null;
   }

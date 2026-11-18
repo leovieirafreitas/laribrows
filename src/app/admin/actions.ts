@@ -6,10 +6,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { hasConflict, loadScheduleContext } from "@/lib/availability";
 import { approvePayment } from "@/lib/booking";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, startSession } from "@/lib/auth";
 import { admins, appointments, dateOverrides, db, payments, services, settings, workingHours, type AppointmentStatus, type PaymentMethod } from "@/lib/db";
 import { parseBRL } from "@/lib/format";
-import { getSettings } from "@/lib/settings";
+import { getSettings, invalidateSettingsCache } from "@/lib/settings";
 import { addDays, dayIndex, isValidDate, timeToMin } from "@/lib/time";
 
 export type ActionState = { ok: boolean; message: string } | null;
@@ -335,6 +335,7 @@ export async function saveSettingsAction(section: "studio" | "payments" | "sched
   }
 
   await db.update(settings).set(patch).where(eq(settings.id, 1));
+  invalidateSettingsCache();
   refreshAdmin();
   return { ok: true, message: "Configurações salvas." };
 }
@@ -347,14 +348,16 @@ export async function changePasswordAction(_prev: ActionState, fd: FormData): Pr
   const email = str(fd, "email").toLowerCase();
   if (!row || !(await bcrypt.compare(current, row.passwordHash))) return { ok: false, message: "Senha atual incorreta." };
   if (next && next.length < 8) return { ok: false, message: "A nova senha precisa ter pelo menos 8 caracteres." };
-  await db
+  const [updated] = await db
     .update(admins)
     .set({
       name: str(fd, "name") || row.name,
       email: email || row.email,
       ...(next ? { passwordHash: await bcrypt.hash(next, 10) } : {}),
     })
-    .where(eq(admins.id, admin.id));
+    .where(eq(admins.id, admin.id))
+    .returning();
+  await startSession(updated); // o token guarda nome e e-mail
   refreshAdmin();
   return { ok: true, message: "Acesso atualizado." };
 }

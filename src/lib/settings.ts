@@ -2,11 +2,33 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { db, settings, type Settings } from "@/lib/db";
 
-export async function getSettings(): Promise<Settings> {
+async function loadSettings(): Promise<Settings> {
   const row = await db.query.settings.findFirst({ where: eq(settings.id, 1) });
   if (row) return row;
   await db.insert(settings).values({ id: 1 }).onConflictDoNothing();
   return (await db.query.settings.findFirst({ where: eq(settings.id, 1) }))!;
+}
+
+/*
+ * As configurações mudam raramente e são lidas em quase toda página:
+ * guardamos em memória por 30s (e limpamos na hora quando o painel salva).
+ */
+const SETTINGS_TTL_MS = 30_000;
+const memo = globalThis as unknown as { __lbSettings?: { at: number; value: Promise<Settings> } };
+
+export function getSettings(): Promise<Settings> {
+  const hit = memo.__lbSettings;
+  if (hit && Date.now() - hit.at < SETTINGS_TTL_MS) return hit.value;
+  const value = loadSettings().catch((err) => {
+    memo.__lbSettings = undefined; // não guarda erro
+    throw err;
+  });
+  memo.__lbSettings = { at: Date.now(), value };
+  return value;
+}
+
+export function invalidateSettingsCache() {
+  memo.__lbSettings = undefined;
 }
 
 export function mercadoPagoConfigured() {

@@ -18,7 +18,7 @@ export async function loginAction(_prev: { error: string; email: string } | null
     await new Promise((r) => setTimeout(r, 600));
     return { error: "E-mail ou senha incorretos.", email };
   }
-  await startSession(admin.id);
+  await startSession(admin);
   redirect("/admin");
 }
 
