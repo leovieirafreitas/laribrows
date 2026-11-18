@@ -13,8 +13,12 @@ import { todayInStudio } from "@/lib/time";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Novo agendamento" };
 
-export default async function NovoAgendamentoPage({ searchParams }: { searchParams: Promise<{ data?: string }> }) {
-  const { data } = await searchParams;
+export default async function NovoAgendamentoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ data?: string; nome?: string; tel?: string; email?: string }>;
+}) {
+  const { data, nome = "", tel = "", email = "" } = await searchParams;
   const list = await db.select().from(services).orderBy(asc(services.sortOrder), asc(services.name));
 
   return (
@@ -48,15 +52,15 @@ export default async function NovoAgendamentoPage({ searchParams }: { searchPara
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="label">Nome da cliente</label>
-            <input name="clientName" required className="field" />
+            <input name="clientName" required className="field" defaultValue={nome} />
           </div>
           <div>
             <label className="label">WhatsApp</label>
-            <input name="clientPhone" required className="field" inputMode="tel" placeholder="(11) 98765-4321" />
+            <input name="clientPhone" required className="field" inputMode="tel" placeholder="(92) 98765-4321" defaultValue={tel} />
           </div>
           <div>
             <label className="label">E-mail (opcional)</label>
-            <input name="clientEmail" type="email" className="field" />
+            <input name="clientEmail" type="email" className="field" defaultValue={email} />
           </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">

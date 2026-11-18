@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarCheck2, CalendarDays, CircleCheck, Hourglass, Plus, Wallet } from "lucide-react";
+import { AlertTriangle, CalendarCheck2, CalendarDays, CircleCheck, Hourglass, Plus, UserPlus, Users, Wallet } from "lucide-react";
 import { confirmPendingPaymentAction } from "@/app/admin/actions";
 import { AppointmentItem, PageHeader } from "@/components/admin/AppointmentItem";
 import { RevenueChart } from "@/components/admin/RevenueChart";
 import { SubmitButton } from "@/components/ui/client";
 import { getDashboardData } from "@/lib/admin-data";
+import { getClientStats } from "@/lib/clients";
 import { formatBRL } from "@/lib/format";
 import { availableMethods, getSettings } from "@/lib/settings";
 import { formatDateCompact, formatDateLong, minToTime } from "@/lib/time";
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ senha?: string }> }) {
-  const [d, s, { senha }] = await Promise.all([getDashboardData(), getSettings(), searchParams]);
+  const [d, s, { senha }, clients] = await Promise.all([getDashboardData(), getSettings(), searchParams, getClientStats()]);
   const methods = availableMethods(s);
   const paymentWarning = s.chargeMode !== "none" && (methods.simulation || methods.missingSetup);
   const hour = Math.floor(d.nowMinutes / 60);
@@ -59,11 +60,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       )}
 
       {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Stat icon={<CalendarCheck2 />} label="Atendimentos hoje" value={String(d.todayList.filter((a) => a.status !== "PENDING_PAYMENT").length)} />
         <Stat icon={<CalendarDays />} label="Próximos 7 dias" value={String(d.weekCount)} />
+        <Stat
+          icon={<Users />}
+          label="Clientes"
+          value={String(clients.total)}
+          hint={clients.withAccount ? `${clients.withAccount} com conta no site` : "agendaram ou criaram conta"}
+          href="/admin/clientes"
+        />
         <Stat icon={<Wallet />} label="Recebido no mês" value={formatBRL(d.monthRevenue)} />
         <Stat icon={<Hourglass />} label="A receber no studio" value={formatBRL(d.toReceive)} hint="restante dos agendamentos confirmados" />
+        <Stat icon={<UserPlus />} label="Novas clientes no mês" value={String(clients.newThisMonth)} hint="primeiro agendamento ou cadastro" href="/admin/clientes?aba=novas" />
       </div>
 
       {/* PIX para conferir */}
@@ -168,15 +177,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   );
 }
 
-function Stat({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value: string; hint?: string }) {
-  return (
-    <div className="card p-5">
+function Stat({ icon, label, value, hint, href }: { icon: React.ReactNode; label: string; value: string; hint?: string; href?: string }) {
+  const body = (
+    <>
       <div className="flex items-center gap-2 text-plum-600/70 [&>svg]:size-4 [&>svg]:text-lavender-500">
         {icon}
         <span className="text-xs tracking-wide">{label}</span>
       </div>
       <p className="mt-3 font-display text-4xl text-plum-900 tabular-nums">{value}</p>
       {hint && <p className="mt-1 text-xs text-plum-600/50">{hint}</p>}
-    </div>
+    </>
+  );
+  return href ? (
+    <Link href={href} className="card p-5 transition hover:ring-2 hover:ring-lavender-200">
+      {body}
+    </Link>
+  ) : (
+    <div className="card p-5">{body}</div>
   );
 }
