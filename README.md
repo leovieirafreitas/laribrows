@@ -93,7 +93,7 @@ O banco continua no **Supabase**.
 1. **Fonte → Git**: URL `https://github.com/leovieirafreitas/laribrows.git`, ramo `main`, caminho de build `/`.
 2. **Construção (Build)**: escolha **Dockerfile** (arquivo `Dockerfile`).
 3. **Ambiente**: cole as variáveis da tabela abaixo.
-4. **Domínios**: adicione `laribrows.com.br` (e `www.laribrows.com.br`), com HTTPS, apontando para a **porta 3000**.
+4. **Domínios**: adicione `laribrows.com.br` (e `www.laribrows.com.br`), com HTTPS, protocolo HTTP e a **mesma porta do domínio padrão do EasyPanel** (normalmente **80** — o EasyPanel define a variável `PORT` do app; fora dele o padrão é 3000).
    No DNS do domínio, crie um registro **A** de `@` (e de `www`) para o IP do servidor.
    Não apague os registros do Resend (e-mail) que já estão lá.
 5. **Implantar**. Cada novo `git push` na `main` pode ser publicado com "Implantar" (ou ative o deploy automático).

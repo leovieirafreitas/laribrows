@@ -4,7 +4,13 @@ import { SESSION_COOKIE, verifySession } from "@/lib/session";
 import { refreshClientSession } from "@/lib/supabase/proxy";
 
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
+
+  // Endereço único: quem chega pelo "www" vai para o endereço oficial (NEXT_PUBLIC_SITE_URL).
+  // Evita sessões separadas (logar duas vezes) entre laribrows.com.br e www.laribrows.com.br.
+  const official = new URL(siteUrl());
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (host === `www.${official.host}`) return NextResponse.redirect(new URL(pathname + search, official), 308);
 
   // Painel: checagem otimista da sessão do admin.
   if (pathname.startsWith("/admin")) {
