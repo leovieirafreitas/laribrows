@@ -8,6 +8,8 @@ import { SubmitButton } from "@/components/ui/client";
 import { DateField, SelectField, TimeField } from "@/components/ui/pickers";
 import { db, services } from "@/lib/db";
 import { formatBRL } from "@/lib/format";
+import { servicePrice } from "@/lib/pricing";
+import { getSettings, promoOf } from "@/lib/settings";
 import { todayInStudio } from "@/lib/time";
 import { whatsappConfigured } from "@/lib/whatsapp";
 import { requireAdmin } from "@/lib/auth";
@@ -22,7 +24,8 @@ export default async function NovoAgendamentoPage({
 }) {
   await requireAdmin();
   const { data, nome = "", tel = "", email = "" } = await searchParams;
-  const list = await db.select().from(services).orderBy(asc(services.sortOrder), asc(services.name));
+  const [list, settingsRow] = await Promise.all([db.select().from(services).orderBy(asc(services.sortOrder), asc(services.name)), getSettings()]);
+  const today = todayInStudio();
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -39,7 +42,11 @@ export default async function NovoAgendamentoPage({
             name="serviceId"
             ariaLabel="Procedimento"
             panelClassName="w-[22rem]"
-            options={list.map((s) => ({ value: s.id, label: s.name, hint: `${formatBRL(s.priceCents)} · ${s.durationMin} min${s.active ? "" : " · inativo"}` }))}
+            options={list.map((svc) => {
+              const p = servicePrice(svc, promoOf(settingsRow), today);
+              const price = p.promoLabel ? `${p.promoLabel}: ${formatBRL(p.priceCents)} (de ${formatBRL(svc.priceCents)})` : formatBRL(p.priceCents);
+              return { value: svc.id, label: svc.name, hint: `${price} · ${svc.durationMin} min${svc.active ? "" : " · inativo"}` };
+            })}
           />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">

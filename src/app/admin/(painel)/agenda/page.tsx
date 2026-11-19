@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/admin/AppointmentItem";
 import { cleanupExpired, daySchedule, loadScheduleContext } from "@/lib/availability";
 import { appointments, db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
-import { isValidDate, minToTime, monthDates, todayInStudio } from "@/lib/time";
+import { isValidDate, minToTime, monthDates, todayInStudio, weekdayOf } from "@/lib/time";
 import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +49,10 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
         : "Fechado para agendamentos",
       note: o?.note ?? "",
       hasOverride: Boolean(o),
+      blocks: ctx.blocks
+        .filter((b) => b.date === date || (b.date == null && b.weekday === weekdayOf(date)))
+        .sort((a, b) => a.startMin - b.startMin)
+        .map((b) => ({ text: `${minToTime(b.startMin)}–${minToTime(b.endMin)}`, note: b.note, weekly: b.date == null })),
       items: list.filter((a) => a.date === date),
     };
   });

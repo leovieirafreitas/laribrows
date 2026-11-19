@@ -2,12 +2,12 @@ import "server-only";
 import { and, eq, gt, inArray, lt, ne, or, sql } from "drizzle-orm";
 import { appointments, db, payments, services, type Appointment, type Payment, type Settings } from "@/lib/db";
 import { BLOCKING_STATUSES, computeSlots, loadScheduleContext } from "@/lib/availability";
-import { MIN_ONLINE_CENTS } from "@/lib/pricing";
-import { availableMethods, computeDueNow, getSettings, mercadoPagoConfigured, paymentSimulationAllowed, siteUrl } from "@/lib/settings";
+import { MIN_ONLINE_CENTS, servicePrice } from "@/lib/pricing";
+import { availableMethods, computeDueNow, getSettings, mercadoPagoConfigured, paymentSimulationAllowed, promoOf, siteUrl } from "@/lib/settings";
 import { buildPixCode } from "@/lib/payments/pix-brcode";
 import * as infinitepay from "@/lib/payments/infinitepay";
 import * as mercadopago from "@/lib/payments/mercadopago";
-import { formatDateShort, minToTime } from "@/lib/time";
+import { formatDateShort, minToTime, todayInStudio } from "@/lib/time";
 import { notifyConfirmed } from "@/lib/whatsapp-notify";
 
 export class BookingError extends Error {}
@@ -46,7 +46,9 @@ export async function createBooking(input: CreateBookingInput) {
   });
   if (!service) throw new BookingError("Procedimento indisponível.");
 
-  const dueNow = computeDueNow(s, service.priceCents, input.payOption);
+  // Preço de agora (promoção, se estiver valendo), calculado aqui no servidor.
+  const price = servicePrice(service, promoOf(s), todayInStudio());
+  const dueNow = computeDueNow(s, price.priceCents, input.payOption);
   const needsPayment = dueNow > 0;
   if (needsPayment && dueNow < MIN_ONLINE_CENTS) {
     throw new BookingError("O pagamento online é a partir de R$ 1,00. Fale com o studio pelo WhatsApp para agendar.");
@@ -101,7 +103,8 @@ export async function createBooking(input: CreateBookingInput) {
         startMin: input.startMin,
         endMin: input.startMin + service.durationMin,
         status: needsPayment ? "PENDING_PAYMENT" : "CONFIRMED",
-        totalCents: service.priceCents,
+        totalCents: price.priceCents,
+        promoLabel: price.promoLabel,
         dueNowCents: dueNow,
         expiresAt,
       })

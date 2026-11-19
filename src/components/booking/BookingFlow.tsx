@@ -10,7 +10,8 @@ import { depositCents } from "@/lib/pricing";
 import type { PublicSettings } from "@/lib/settings";
 import { addMonths, formatDateLong, minToTime, STUDIO_TZ_LABEL } from "@/lib/time";
 
-type ServiceOption = { id: string; name: string; description: string; durationMin: number; priceCents: number };
+/** priceCents = preço que vale agora; fullPriceCents = preço normal (só com promoção). */
+type ServiceOption = { id: string; name: string; description: string; durationMin: number; priceCents: number; fullPriceCents: number | null; promoLabel: string };
 
 const STEPS = ["Procedimento", "Data e horário", "Seus dados", "Confirmação"];
 
@@ -197,10 +198,16 @@ export function BookingFlow({
                         {active && <Check className="size-3" />}
                       </span>
                       <span className="flex-1">
+                        {svc.promoLabel && (
+                          <span className="mb-1.5 inline-block rounded-full bg-plum-900 px-2.5 py-0.5 text-[0.6rem] tracking-[0.18em] text-champagne-300 uppercase">
+                            {svc.promoLabel}
+                          </span>
+                        )}
                         <span className="block font-display text-xl leading-tight">{svc.name}</span>
                         <span className="mt-1 line-clamp-2 block text-sm text-plum-700/70">{svc.description}</span>
                       </span>
                       <span className="text-right">
+                        {svc.fullPriceCents != null && <span className="block text-xs text-plum-600/60 line-through">{formatBRL(svc.fullPriceCents)}</span>}
                         <span className="block font-display text-2xl">{formatBRL(svc.priceCents)}</span>
                         <span className="flex items-center justify-end gap-1 text-xs text-plum-600/60">
                           <Clock className="size-3" /> {formatDuration(svc.durationMin)}
@@ -430,7 +437,19 @@ export function BookingFlow({
             <Row label="Data" value={date ? <span>{formatDateLong(date)}</span> : "—"} />
             <Row label="Horário" value={time != null ? `${minToTime(time)} (Manaus)` : "—"} />
             <div className="hairline my-2" />
-            <Row label="Valor do procedimento" value={service ? formatBRL(service.priceCents) : "—"} />
+            <Row
+              label={service?.promoLabel ? `Valor (${service.promoLabel})` : "Valor do procedimento"}
+              value={
+                service ? (
+                  <span>
+                    {service.fullPriceCents != null && <span className="mr-1.5 text-plum-600/50 line-through">{formatBRL(service.fullPriceCents)}</span>}
+                    {formatBRL(service.priceCents)}
+                  </span>
+                ) : (
+                  "—"
+                )
+              }
+            />
             {service && s.chargeMode !== "none" && (
               <>
                 <Row label={dueNow < service.priceCents ? `Sinal (${s.depositPercent}%)` : "Pagamento online"} value={<strong className="font-medium text-plum-900">{formatBRL(dueNow)}</strong>} />

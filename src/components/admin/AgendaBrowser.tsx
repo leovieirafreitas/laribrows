@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Lock, Plus, Unlock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Lock, Plus, Unlock } from "lucide-react";
 import { toggleDayBlockAction } from "@/app/admin/actions";
 import { AppointmentItem } from "@/components/admin/AppointmentItem";
 import { SubmitButton } from "@/components/ui/client";
@@ -15,6 +15,8 @@ export type AgendaDay = {
   scheduleText: string;
   note: string;
   hasOverride: boolean;
+  /** Horários bloqueados neste dia (num dia ou toda semana). */
+  blocks: { text: string; note: string; weekly: boolean }[];
   items: Appointment[];
 };
 
@@ -143,10 +145,29 @@ export function AgendaBrowser({ month, today, days, initialSelected }: { month: 
               <Unlock className="size-3.5" /> Abrir com horário especial
             </Link>
           )}
+          {day.open && (
+            <Link href={`/admin/horarios?bloquear=${day.date}`} className="btn btn-ghost btn-sm">
+              <Clock className="size-3.5" /> Bloquear horário
+            </Link>
+          )}
           <Link href={`/admin/agendamentos/novo?data=${day.date}`} className="btn btn-ghost btn-sm">
             <Plus className="size-3.5" /> Agendar neste dia
           </Link>
         </div>
+
+        {day.open && day.blocks.length > 0 && (
+          <ul className="mt-4 space-y-1.5">
+            {day.blocks.map((b, i) => (
+              <li key={i} className="flex items-center gap-2 rounded-2xl bg-stone-100 px-3 py-2 text-sm text-stone-600">
+                <Lock className="size-3.5 shrink-0" />
+                <span className="font-medium">Bloqueado {b.text}</span>
+                <span className="truncate text-xs">
+                  {[b.weekly ? "toda semana" : "", b.note].filter(Boolean).join(" · ")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
 
         <div className="mt-6 border-t border-lavender-100 pt-3">
           {day.items.length === 0 ? (

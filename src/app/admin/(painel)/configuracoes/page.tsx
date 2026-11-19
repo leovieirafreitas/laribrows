@@ -4,6 +4,8 @@ import { ActionForm } from "@/components/admin/ActionForm";
 import { PageHeader } from "@/components/admin/AppointmentItem";
 import { PaymentSettingsFields } from "@/components/admin/PaymentSettingsFields";
 import { SubmitButton } from "@/components/ui/client";
+import { SelectField } from "@/components/ui/pickers";
+import { minToTime } from "@/lib/time";
 import { requireAdmin } from "@/lib/auth";
 import { infinitePayHandle, infinitePayHasApiKey } from "@/lib/payments/infinitepay";
 import { GATEWAY_LABEL, getSettings, mercadoPagoIsTest, onlineGateway, paymentSimulationAllowed, siteUrl } from "@/lib/settings";
@@ -85,7 +87,25 @@ export default async function ConfiguracoesPage() {
       {/* Agenda */}
       <Section title="Regras da agenda" text="Como os horários são oferecidos às clientes.">
         <ActionForm action={saveSettingsAction.bind(null, "schedule")} className="grid gap-4 sm:grid-cols-2">
-          <NumberField label="Intervalo entre horários (min)" name="slotIntervalMin" defaultValue={s.slotIntervalMin} hint="Ex.: 30 → 9:00, 9:30, 10:00…" />
+          <div>
+            <label className="label">Como montar os horários</label>
+            <SelectField
+              name="slotIntervalMin"
+              ariaLabel="Como montar os horários"
+              defaultValue={String(s.slotIntervalMin)}
+              panelClassName="w-80"
+              options={[
+                { value: "0", label: "Pela duração do procedimento", hint: "Design de 40 min → 09:00, 09:40, 10:20… sem buracos" },
+                ...[15, 20, 30, 45, 60].map((m) => ({ value: String(m), label: `A cada ${m} minutos`, hint: `Grade fixa: 09:00, ${minToTime(9 * 60 + m)}…` })),
+                ...([0, 15, 20, 30, 45, 60].includes(s.slotIntervalMin)
+                  ? []
+                  : [{ value: String(s.slotIntervalMin), label: `A cada ${s.slotIntervalMin} minutos`, hint: "Grade fixa" }]),
+              ]}
+            />
+            <p className="mt-1 text-xs text-plum-600/60">
+              “Pela duração” encosta um atendimento no outro e começa o próximo assim que um termina.
+            </p>
+          </div>
           <NumberField label="Agenda aberta para os próximos (dias)" name="bookingWindowDays" defaultValue={s.bookingWindowDays} />
           <NumberField label="Antecedência mínima (horas)" name="minAdvanceHours" defaultValue={s.minAdvanceHours} hint="Evita agendamentos em cima da hora." />
           <NumberField label="Tempo para pagar (min)" name="holdMinutes" defaultValue={s.holdMinutes} hint="O horário fica reservado enquanto a cliente paga." />

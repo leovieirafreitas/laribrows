@@ -1,24 +1,30 @@
-import { asc, gte } from "drizzle-orm";
-import { Trash2 } from "lucide-react";
-import { addOverrideAction, deleteOverrideAction, saveWorkingHoursAction } from "@/app/admin/actions";
+import { asc, gte, isNotNull, or } from "drizzle-orm";
+import { Clock, Trash2 } from "lucide-react";
+import { addOverrideAction, deleteOverrideAction, deleteTimeBlockAction, saveWorkingHoursAction } from "@/app/admin/actions";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { PageHeader } from "@/components/admin/AppointmentItem";
+import { TimeBlockForm } from "@/components/admin/TimeBlockForm";
 import { SubmitButton } from "@/components/ui/client";
 import { DateField, TimeField } from "@/components/ui/pickers";
-import { dateOverrides, db, workingHours } from "@/lib/db";
+import { dateOverrides, db, timeBlocks, workingHours } from "@/lib/db";
 import { formatDateCompact, isValidDate, minToTime, todayInStudio, WEEKDAYS_LONG } from "@/lib/time";
 import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Horários e bloqueios" };
 
-export default async function HorariosPage({ searchParams }: { searchParams: Promise<{ abrir?: string }> }) {
+export default async function HorariosPage({ searchParams }: { searchParams: Promise<{ abrir?: string; bloquear?: string }> }) {
   await requireAdmin();
-  const { abrir } = await searchParams;
+  const { abrir, bloquear } = await searchParams;
   const today = todayInStudio();
-  const [hours, overrides] = await Promise.all([
+  const [hours, overrides, blocks] = await Promise.all([
     db.select().from(workingHours),
     db.select().from(dateOverrides).where(gte(dateOverrides.date, today)).orderBy(asc(dateOverrides.date)),
+    db
+      .select()
+      .from(timeBlocks)
+      .where(or(gte(timeBlocks.date, today), isNotNull(timeBlocks.weekday)))
+      .orderBy(asc(timeBlocks.weekday), asc(timeBlocks.date), asc(timeBlocks.startMin)),
   ]);
   const byDay = new Map(hours.map((h) => [h.weekday, h]));
   // Semana começando na segunda
@@ -100,6 +106,37 @@ export default async function HorariosPage({ searchParams }: { searchParams: Pro
               </div>
               <SubmitButton className="btn btn-primary btn-sm">Salvar</SubmitButton>
             </ActionForm>
+          </section>
+
+          <section className="card p-5 sm:p-6">
+            <h2 className="font-display text-2xl">Bloquear horários</h2>
+            <p className="mt-1 text-sm text-plum-600/70">
+              Fecha só um pedaço do dia (ex.: sábado das 18:00 às 19:15). O site deixa de oferecer horários que caiam nesse intervalo.
+            </p>
+            <TimeBlockForm today={today} initialDate={bloquear && isValidDate(bloquear) ? bloquear : undefined} />
+            {blocks.length > 0 && (
+              <ul className="mt-5 divide-y divide-lavender-100 border-t border-lavender-100">
+                {blocks.map((b) => (
+                  <li key={b.id} className="flex items-center gap-3 py-2.5">
+                    <Clock className="size-4 shrink-0 text-lavender-500" />
+                    <div className="flex-1 text-sm">
+                      <p className="font-medium text-plum-800">
+                        {b.date ? formatDateCompact(b.date) : `Todo(a) ${WEEKDAYS_LONG[b.weekday ?? 0].toLowerCase()}`} · {minToTime(b.startMin)}–{minToTime(b.endMin)}
+                      </p>
+                      {b.note && <p className="text-xs text-plum-600/70">{b.note}</p>}
+                    </div>
+                    <form action={deleteTimeBlockAction.bind(null, b.id)}>
+                      <SubmitButton
+                        className="grid size-8 cursor-pointer place-items-center rounded-full text-plum-600/50 hover:bg-rose-50 hover:text-rose-600"
+                        aria-label="Remover bloqueio"
+                      >
+                        <Trash2 className="size-4" />
+                      </SubmitButton>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <section className="card p-5 sm:p-6">

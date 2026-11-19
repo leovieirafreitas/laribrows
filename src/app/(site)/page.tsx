@@ -7,15 +7,19 @@ import larissa from "@/assets/larissa.jpg";
 import { SectionTitle } from "@/components/ui";
 import { db, services } from "@/lib/db";
 import { formatBRL, formatDuration } from "@/lib/format";
-import { getSettings } from "@/lib/settings";
+import { servicePrice } from "@/lib/pricing";
+import { getSettings, promoOf } from "@/lib/settings";
+import { todayInStudio } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [s, list] = await Promise.all([
+  const [s, rows] = await Promise.all([
     getSettings(),
     db.select().from(services).where(eq(services.active, true)).orderBy(asc(services.sortOrder), asc(services.name)),
   ]);
+  const today = todayInStudio();
+  const list = rows.map((svc) => ({ ...svc, ...servicePrice(svc, promoOf(s), today) }));
 
   const depositText =
     s.chargeMode === "deposit"
@@ -112,6 +116,11 @@ export default async function HomePage() {
                   className="card group flex animate-fade-up flex-col p-7 transition duration-500 hover:-translate-y-1 hover:border-lavender-300"
                   style={{ animationDelay: `${i * 60}ms` }}
                 >
+                  {svc.promoLabel && (
+                    <span className="mb-3 self-start rounded-full bg-plum-900 px-3 py-1 text-[0.62rem] tracking-[0.2em] text-champagne-300 uppercase">
+                      {svc.promoLabel}
+                    </span>
+                  )}
                   <div className="flex items-start justify-between gap-4">
                     <h3 className="font-display text-2xl leading-tight font-normal">{svc.name}</h3>
                     <span className="mt-1 h-px w-8 shrink-0 bg-champagne-400 transition-all duration-500 group-hover:w-12" />
@@ -122,7 +131,10 @@ export default async function HomePage() {
                       <p className="flex items-center gap-1.5 text-xs text-plum-600/70">
                         <Clock className="size-3.5" /> {formatDuration(svc.durationMin)}
                       </p>
-                      <p className="mt-1 font-display text-3xl text-plum-900">{formatBRL(svc.priceCents)}</p>
+                      {svc.fullPriceCents != null && (
+                        <p className="mt-1 text-sm text-plum-600/60 line-through">{formatBRL(svc.fullPriceCents)}</p>
+                      )}
+                      <p className={`font-display text-3xl text-plum-900 ${svc.fullPriceCents != null ? "" : "mt-1"}`}>{formatBRL(svc.priceCents)}</p>
                     </div>
                     <Link href={`/agendar?servico=${svc.id}`} className="btn btn-soft btn-sm">
                       Agendar

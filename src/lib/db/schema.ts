@@ -30,6 +30,8 @@ export const services = pgTable("services", {
   description: text("description").notNull().default(""),
   durationMin: integer("duration_min").notNull(),
   priceCents: integer("price_cents").notNull(),
+  /** Preço durante a promoção (ex.: Black Friday). Vazio = não entra na promoção. */
+  promoPriceCents: integer("promo_price_cents"),
   active: boolean("active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: createdAt(),
@@ -56,6 +58,24 @@ export const dateOverrides = pgTable("date_overrides", {
   endMin: integer("end_min"),
   note: text("note").notNull().default(""),
 }).enableRLS();
+
+/**
+ * Horários bloqueados dentro de um dia aberto (ex.: sábado das 18:00 às 19:15).
+ * Ou vale para uma data (date) ou para toda semana naquele dia (weekday 0=domingo … 6=sábado).
+ */
+export const timeBlocks = pgTable(
+  "time_blocks",
+  {
+    id: id(),
+    date: text("date"), // YYYY-MM-DD (bloqueio de um dia)
+    weekday: integer("weekday"), // 0–6 (bloqueio de toda semana)
+    startMin: integer("start_min").notNull(),
+    endMin: integer("end_min").notNull(),
+    note: text("note").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (t) => [index("time_blocks_date_idx").on(t.date)],
+).enableRLS();
 
 export type AppointmentStatus =
   | "PENDING_PAYMENT" // aguardando pagamento (segura o horário até expirar)
@@ -89,6 +109,8 @@ export const appointments = pgTable(
     paidCents: integer("paid_cents").notNull().default(0),
     expiresAt: ts("expires_at"),
     adminNotes: text("admin_notes").notNull().default(""),
+    /** Promoção usada no preço deste agendamento (ex.: "Black Friday"); vazio = preço normal. */
+    promoLabel: text("promo_label").notNull().default(""),
     /** WhatsApp: quando a confirmação e o lembrete foram enviados (evita mandar duas vezes). */
     waConfirmSentAt: ts("wa_confirm_sent_at"),
     waReminderSentAt: ts("wa_reminder_sent_at"),
@@ -169,6 +191,12 @@ export const settings = pgTable("settings", {
       "O sinal garante o seu horário e é abatido no valor do procedimento. Remarcações com até 24h de antecedência. Em caso de falta sem aviso, o sinal não é devolvido.",
     ),
 
+  /* Promoção (ex.: Black Friday): vale para agendamentos feitos entre as datas (vazias = sem limite). */
+  promoEnabled: boolean("promo_enabled").notNull().default(false),
+  promoLabel: text("promo_label").notNull().default("Black Friday"),
+  promoStart: text("promo_start").notNull().default(""), // YYYY-MM-DD
+  promoEnd: text("promo_end").notNull().default(""), // YYYY-MM-DD (inclusive)
+
   /* WhatsApp (Evolution API). Textos vazios = modelo padrão do sistema. */
   waConfirmEnabled: boolean("wa_confirm_enabled").notNull().default(true),
   waConfirmTemplate: text("wa_confirm_template").notNull().default(""),
@@ -210,3 +238,4 @@ export type Payment = typeof payments.$inferSelect;
 export type Settings = typeof settings.$inferSelect;
 export type WorkingHour = typeof workingHours.$inferSelect;
 export type DateOverride = typeof dateOverrides.$inferSelect;
+export type TimeBlock = typeof timeBlocks.$inferSelect;

@@ -1,16 +1,17 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { hasConflict, loadScheduleContext } from "@/lib/availability";
 import { approvePayment } from "@/lib/booking";
 import { requireAdmin, startSession } from "@/lib/auth";
-import { admins, appointments, dateOverrides, db, payments, services, settings, workingHours, type AppointmentStatus, type PaymentMethod } from "@/lib/db";
+import { admins, appointments, dateOverrides, db, payments, services, settings, timeBlocks, workingHours, type AppointmentStatus, type PaymentMethod } from "@/lib/db";
 import { parseBRL } from "@/lib/format";
-import { getSettings, invalidateSettingsCache } from "@/lib/settings";
-import { addDays, dayIndex, isValidDate, timeToMin } from "@/lib/time";
+import { servicePrice } from "@/lib/pricing";
+import { getSettings, invalidateSettingsCache, promoOf } from "@/lib/settings";
+import { addDays, dayIndex, isValidDate, timeToMin, todayInStudio, weekdayOf } from "@/lib/time";
 import { notifyConfirmed, notifyRescheduled } from "@/lib/whatsapp-notify";
 
 export type ActionState = { ok: boolean; message: string } | null;
@@ -111,7 +112,7 @@ export async function rescheduleAction(appointmentId: string, _prev: ActionState
   const duration = appt.endMin - appt.startMin;
   const ctx = await loadScheduleContext(await getSettings(), date, date, appt.id);
   if (!force && hasConflict(ctx, date, start, start + duration)) {
-    return { ok: false, message: "Já existe um atendimento nesse horário. Marque “encaixar mesmo assim” para forçar." };
+    return { ok: false, message: "Esse horário já está ocupado ou bloqueado. Marque “encaixar mesmo assim” para forçar." };
   }
   await db.update(appointments).set({ date, startMin: start, endMin: start + duration }).where(eq(appointments.id, appointmentId));
   if (bool(fd, "notifyClient")) notifyRescheduled(appointmentId, { byClient: false, before: { date: appt.date, startMin: appt.startMin } });
@@ -140,13 +141,14 @@ export async function createManualAppointmentAction(_prev: ActionState, fd: Form
   if (name.length < 2 || phone.replace(/\D/g, "").length < 10) return { ok: false, message: "Informe nome e WhatsApp da cliente." };
 
   const priceInput = str(fd, "price");
-  const total = priceInput ? parseBRL(priceInput) : service.priceCents;
+  const current = servicePrice(service, promoOf(await getSettings()), todayInStudio());
+  const total = priceInput ? parseBRL(priceInput) : current.priceCents;
   const paid = str(fd, "paid") ? parseBRL(str(fd, "paid")) : 0;
   if (!Number.isFinite(total) || total < 0 || !Number.isFinite(paid) || paid < 0) return { ok: false, message: "Valores inválidos." };
 
   const ctx = await loadScheduleContext(await getSettings(), date, date);
   if (!bool(fd, "force") && hasConflict(ctx, date, start, start + service.durationMin)) {
-    return { ok: false, message: "Já existe um atendimento nesse horário. Marque “encaixar mesmo assim” para forçar." };
+    return { ok: false, message: "Esse horário já está ocupado ou bloqueado. Marque “encaixar mesmo assim” para forçar." };
   }
 
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -167,6 +169,7 @@ export async function createManualAppointmentAction(_prev: ActionState, fd: Form
       endMin: start + service.durationMin,
       status: "CONFIRMED",
       totalCents: total,
+      promoLabel: priceInput ? "" : current.promoLabel,
       dueNowCents: 0,
     })
     .returning();
@@ -199,10 +202,15 @@ export async function saveServiceAction(serviceId: string | null, _prev: ActionS
   if (name.length < 2) return { ok: false, message: "Dê um nome ao procedimento." };
   if (!Number.isFinite(price) || price < 0) return { ok: false, message: "Preço inválido." };
   if (duration < 5 || duration > 600) return { ok: false, message: "Duração entre 5 e 600 minutos." };
+  const promoInput = str(fd, "promoPrice");
+  const promo = promoInput ? parseBRL(promoInput) : null;
+  if (promo != null && (!Number.isFinite(promo) || promo < 0)) return { ok: false, message: "Preço promocional inválido." };
+  if (promo != null && promo >= price) return { ok: false, message: "O preço promocional precisa ser menor que o valor normal." };
   const values = {
     name,
     description: str(fd, "description").slice(0, 400),
     priceCents: price,
+    promoPriceCents: promo,
     durationMin: Math.round(duration),
     sortOrder: num(fd, "sortOrder"),
     active: bool(fd, "active"),
@@ -211,6 +219,24 @@ export async function saveServiceAction(serviceId: string | null, _prev: ActionS
   else await db.insert(services).values(values);
   refreshAdmin();
   return { ok: true, message: serviceId ? "Procedimento atualizado." : "Procedimento criado." };
+}
+
+/** Promoção geral (ex.: Black Friday): nome, liga/desliga e período. */
+export async function savePromoAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const label = str(fd, "promoLabel").slice(0, 40) || "Promoção";
+  const start = str(fd, "promoStart");
+  const end = str(fd, "promoEnd");
+  if (start && !isValidDate(start)) return { ok: false, message: "Data de início inválida." };
+  if (end && !isValidDate(end)) return { ok: false, message: "Data de fim inválida." };
+  if (start && end && end < start) return { ok: false, message: "A data de fim precisa ser depois do início." };
+  await db
+    .update(settings)
+    .set({ promoEnabled: bool(fd, "promoEnabled"), promoLabel: label, promoStart: start, promoEnd: end })
+    .where(eq(settings.id, 1));
+  invalidateSettingsCache();
+  refreshAdmin();
+  return { ok: true, message: "Promoção salva." };
 }
 
 export async function deleteServiceAction(serviceId: string) {
@@ -265,6 +291,50 @@ export async function addOverrideAction(_prev: ActionState, fd: FormData): Promi
   }
   refreshAdmin();
   return { ok: true, message: type === "special" ? "Horário especial salvo." : "Dias bloqueados." };
+}
+
+/** Bloqueia um intervalo de horário: num dia específico ou toda semana naquele dia. */
+export async function addTimeBlockAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const mode = str(fd, "mode") === "weekly" ? "weekly" : "date";
+  const date = str(fd, "date");
+  const weekday = Number(str(fd, "weekday"));
+  const start = time(fd, "start");
+  const end = time(fd, "end");
+  const note = str(fd, "note").slice(0, 120);
+  if (mode === "date" && (!isValidDate(date) || dayIndex(date) < dayIndex(todayInStudio()))) return { ok: false, message: "Escolha a data do bloqueio." };
+  if (mode === "weekly" && !(Number.isInteger(weekday) && weekday >= 0 && weekday <= 6)) return { ok: false, message: "Escolha o dia da semana." };
+  if (start == null || end == null) return { ok: false, message: "Informe o horário de início e de fim." };
+  if (end <= start) return { ok: false, message: "O fim precisa ser depois do início." };
+
+  await db.insert(timeBlocks).values({ date: mode === "date" ? date : null, weekday: mode === "weekly" ? weekday : null, startMin: start, endMin: end, note });
+
+  // Aviso: atendimentos já marcados dentro do bloqueio continuam valendo.
+  const today = todayInStudio();
+  const clash = (
+    await db
+      .select({ date: appointments.date, startMin: appointments.startMin, endMin: appointments.endMin })
+      .from(appointments)
+      .where(
+        and(
+          mode === "date" ? eq(appointments.date, date) : gte(appointments.date, today),
+          inArray(appointments.status, ["PENDING_PAYMENT", "AWAITING_CONFIRMATION", "CONFIRMED"]),
+        ),
+      )
+  ).filter((a) => (mode === "date" || weekdayOf(a.date) === weekday) && a.startMin < end && a.endMin > start).length;
+  refreshAdmin();
+  return {
+    ok: true,
+    message: clash
+      ? `Horário bloqueado. Atenção: ${clash} agendamento(s) já marcado(s) nesse intervalo continuam valendo — confira na Agenda.`
+      : "Horário bloqueado.",
+  };
+}
+
+export async function deleteTimeBlockAction(id: string) {
+  await requireAdmin();
+  await db.delete(timeBlocks).where(eq(timeBlocks.id, id));
+  refreshAdmin();
 }
 
 export async function deleteOverrideAction(date: string) {
@@ -337,7 +407,11 @@ export async function saveSettingsAction(section: "studio" | "payments" | "sched
 
   if (section === "schedule") {
     patch = {
-      slotIntervalMin: Math.min(120, Math.max(5, Math.round(num(fd, "slotIntervalMin", 30)))),
+      // 0 = pela duração do procedimento; senão, grade fixa de 5 a 120 min.
+      slotIntervalMin: (() => {
+        const v = Math.round(num(fd, "slotIntervalMin", 30));
+        return v === 0 ? 0 : Math.min(120, Math.max(5, v));
+      })(),
       bookingWindowDays: Math.min(365, Math.max(1, Math.round(num(fd, "bookingWindowDays", 60)))),
       minAdvanceHours: Math.min(168, Math.max(0, Math.round(num(fd, "minAdvanceHours", 2)))),
       holdMinutes: Math.min(240, Math.max(10, Math.round(num(fd, "holdMinutes", 30)))),

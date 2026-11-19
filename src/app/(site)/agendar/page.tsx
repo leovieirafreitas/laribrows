@@ -3,7 +3,8 @@ import { asc, eq } from "drizzle-orm";
 import { BookingFlow } from "@/components/booking/BookingFlow";
 import { db, services } from "@/lib/db";
 import { clientProfile, getClientUser } from "@/lib/client-auth";
-import { availableMethods, getSettings, publicSettings } from "@/lib/settings";
+import { servicePrice } from "@/lib/pricing";
+import { availableMethods, getSettings, promoOf, publicSettings } from "@/lib/settings";
 import { todayInStudio } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -11,14 +12,24 @@ export const metadata: Metadata = { title: "Agendar horário" };
 
 export default async function AgendarPage({ searchParams }: { searchParams: Promise<{ servico?: string }> }) {
   const { servico } = await searchParams;
-  const [s, list] = await Promise.all([
+  const [s, rows] = await Promise.all([
     getSettings(),
     db
-      .select({ id: services.id, name: services.name, description: services.description, durationMin: services.durationMin, priceCents: services.priceCents })
+      .select({
+        id: services.id,
+        name: services.name,
+        description: services.description,
+        durationMin: services.durationMin,
+        priceCents: services.priceCents,
+        promoPriceCents: services.promoPriceCents,
+      })
       .from(services)
       .where(eq(services.active, true))
       .orderBy(asc(services.sortOrder), asc(services.name)),
   ]);
+
+  const today = todayInStudio();
+  const list = rows.map(({ promoPriceCents, ...svc }) => ({ ...svc, ...servicePrice({ priceCents: svc.priceCents, promoPriceCents }, promoOf(s), today) }));
 
   const client = await getClientUser();
   const prefill = client ? { ...(await clientProfile(client)), email: client.email } : null;

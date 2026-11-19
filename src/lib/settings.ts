@@ -2,7 +2,8 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { db, settings, type Settings } from "@/lib/db";
 import { infinitePayConfigured } from "@/lib/payments/infinitepay";
-import { depositCents } from "@/lib/pricing";
+import { depositCents, promoActive, type Promo } from "@/lib/pricing";
+import { todayInStudio } from "@/lib/time";
 
 async function loadSettings(): Promise<Settings> {
   const row = await db.query.settings.findFirst({ where: eq(settings.id, 1) });
@@ -99,6 +100,11 @@ export function cardFeeText(absorbedUpTo: number) {
   };
 }
 
+/** Promoção configurada no painel (Procedimentos). */
+export function promoOf(s: Settings): Promo {
+  return { enabled: s.promoEnabled, label: s.promoLabel, start: s.promoStart, end: s.promoEnd };
+}
+
 /** Configuração pública, segura para mandar ao navegador. */
 export function publicSettings(s: Settings) {
   return {
@@ -116,6 +122,7 @@ export function publicSettings(s: Settings) {
     checkoutNote: onlineGateway() === "infinitepay" ? "Você vai para a página segura da InfinitePay. Depois de pagar, toque em “Continuar” na tela da InfinitePay para voltar ao site com o horário confirmado." : "",
     pixHint: onlineGateway() === "infinitepay" && s.cardFeeAbsorbedUpTo < 12 ? "Sem acréscimo · aprovação na hora" : "Aprovação na hora",
     cancellationPolicy: s.cancellationPolicy,
+    promo: promoActive(promoOf(s), todayInStudio()) ? { label: s.promoLabel.trim() || "Promoção", end: s.promoEnd } : null,
   };
 }
 export type PublicSettings = ReturnType<typeof publicSettings>;

@@ -63,7 +63,7 @@ export default async function AgendamentoAdminPage({ params }: { params: Promise
             <div className="grid gap-5 sm:grid-cols-2">
               <Info label="Procedimento" value={a.serviceName} sub={formatDuration(a.endMin - a.startMin)} />
               <Info label="Data e horário" value={<span>{formatDateLong(a.date)}</span>} sub={`${minToTime(a.startMin)} – ${minToTime(a.endMin)}`} />
-              <Info label="Valor total" value={formatBRL(a.totalCents)} />
+              <Info label={a.promoLabel ? `Valor total (${a.promoLabel})` : "Valor total"} value={formatBRL(a.totalCents)} />
               <Info label="Pago" value={formatBRL(a.paidCents)} sub={remaining > 0 ? `Falta ${formatBRL(remaining)}` : "Quitado ✓"} />
             </div>
             {a.notes && (
