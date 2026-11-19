@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireClientUser, saveStoredProfile } from "@/lib/client-auth";
+import { authErrorMessage, requireClientUser, saveStoredProfile } from "@/lib/client-auth";
 import { ClientActionError, cancelByClient, rescheduleByClient } from "@/lib/client-booking";
-import { formatPhone, onlyDigits } from "@/lib/format";
+import { formatPhone, isValidPhone, onlyDigits } from "@/lib/format";
 import { turnstileSiteKey } from "@/lib/env";
 import { clientIp, MINUTE, tooMany } from "@/lib/rate-limit";
 import { siteUrl } from "@/lib/settings";
@@ -13,17 +13,6 @@ import { createSupabase } from "@/lib/supabase/server";
 import { isValidDate } from "@/lib/time";
 
 export type LoginState = { step: "email" | "code"; email: string; error?: string; info?: string } | null;
-
-function authErrorMessage(message: string, step: "send" | "verify") {
-  if (/rate limit|too many|security purposes/i.test(message)) return "Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.";
-  if (/captcha/i.test(message)) return "Não foi possível confirmar que você não é um robô. Recarregue a página e tente de novo.";
-  if (step === "send") {
-    if (/email address .* invalid/i.test(message)) return "Esse e-mail não parece válido. Confira e tente de novo.";
-    return "Não conseguimos enviar o e-mail agora. Tente novamente mais tarde ou fale com o studio.";
-  }
-  if (/expired|invalid/i.test(message)) return "Código inválido ou expirado. Confira o e-mail ou peça um novo código.";
-  return "Não foi possível entrar agora. Tente novamente.";
-}
 
 /** Passo 1: envia código (e link) de acesso para o e-mail. Cria a conta se ainda não existir. */
 export async function sendCodeAction(_prev: LoginState, fd: FormData): Promise<LoginState> {
@@ -71,11 +60,10 @@ export type ProfileState = { ok: boolean; message: string } | null;
 /** Nome e WhatsApp da cliente: confere e devolve já formatados (ou a mensagem de erro). */
 function readProfile(fd: FormData): { name: string; phone: string } | { error: string } {
   const name = String(fd.get("name") ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
-  let digits = onlyDigits(String(fd.get("phone") ?? ""));
-  if (digits.length >= 12 && digits.startsWith("55")) digits = digits.slice(2);
+  const typed = String(fd.get("phone") ?? "");
   if (name.split(" ").length < 2 || name.length < 5) return { error: "Digite seu nome completo (nome e sobrenome)." };
-  if (digits.length < 10 || digits.length > 11) return { error: "Digite seu WhatsApp com DDD, por exemplo (92) 99999-9999." };
-  return { name, phone: formatPhone(digits) };
+  if (!isValidPhone(typed)) return { error: "Digite seu WhatsApp com DDD, por exemplo (92) 99999-9999." };
+  return { name, phone: formatPhone(typed) };
 }
 
 /**

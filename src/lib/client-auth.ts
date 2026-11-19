@@ -70,3 +70,15 @@ export async function clientProfile(user: ClientUser) {
   });
   return { name: user.name || last?.clientName || "", phone: user.phone || last?.clientPhone || "" };
 }
+
+/** Mensagem para a cliente a partir do erro do Supabase Auth (envio ou conferência do código). */
+export function authErrorMessage(message: string, step: "send" | "verify") {
+  if (/rate limit|too many|security purposes/i.test(message)) return "Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.";
+  if (/captcha/i.test(message)) return "Não foi possível confirmar que você não é um robô. Recarregue a página e tente de novo.";
+  if (step === "send") {
+    if (/email address .* invalid/i.test(message)) return "Esse e-mail não parece válido. Confira e tente de novo.";
+    return "Não conseguimos enviar o e-mail agora. Tente novamente mais tarde ou fale com o studio.";
+  }
+  if (/expired|invalid/i.test(message)) return "Código inválido ou expirado. Confira o e-mail ou peça um novo código.";
+  return "Não foi possível entrar agora. Tente novamente.";
+}

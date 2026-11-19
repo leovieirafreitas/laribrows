@@ -35,11 +35,8 @@ export type CreateBookingInput = {
   payOption: "DEPOSIT" | "FULL";
 };
 
-/**
- * Cria a reserva (segurando o horário) e, se houver cobrança online,
- * gera o pagamento. Retorna para onde a cliente deve ir em seguida.
- */
-export async function createBooking(input: CreateBookingInput) {
+/** Regras que valem antes de reservar (lança BookingError com a mensagem para a cliente). */
+async function validateBooking(input: CreateBookingInput) {
   const s = await getSettings();
   const service = await db.query.services.findFirst({
     where: and(eq(services.id, input.serviceId), eq(services.active, true)),
@@ -76,6 +73,27 @@ export async function createBooking(input: CreateBookingInput) {
       );
     if (n >= 2) throw new BookingError("Você já tem reservas aguardando pagamento. Conclua ou aguarde vencerem antes de reservar outro horário.");
   }
+  return { s, service, price, dueNow, needsPayment };
+}
+
+/**
+ * Confere se dá para reservar (procedimento, valor, forma de pagamento, horário livre) sem gravar
+ * nada — usado antes de mandar o código de confirmação para o e-mail da cliente.
+ */
+export async function checkBookable(input: CreateBookingInput) {
+  const { s, service } = await validateBooking(input);
+  const ctx = await loadScheduleContext(s, input.date, input.date);
+  if (!computeSlots(ctx, input.date, service.durationMin).includes(input.startMin)) {
+    throw new BookingError("Esse horário não está mais disponível. Escolha outro, por favor.");
+  }
+}
+
+/**
+ * Cria a reserva (segurando o horário) e, se houver cobrança online,
+ * gera o pagamento. Retorna para onde a cliente deve ir em seguida.
+ */
+export async function createBooking(input: CreateBookingInput) {
+  const { s, service, price, dueNow, needsPayment } = await validateBooking(input);
 
   const holdMinutes = Math.max(s.holdMinutes, input.method === "PIX" && usesMercadoPagoPix(s) ? 30 : 10);
   const expiresAt = needsPayment ? new Date(Date.now() + holdMinutes * 60_000) : null;

@@ -25,9 +25,9 @@ export function AppointmentItem({ a, showDate = false }: { a: Appointment; showD
       </div>
       <div className="hidden text-right sm:block">
         <StatusBadge status={a.status} />
-        <p className="mt-1 text-xs text-plum-600/60">
-          {remaining > 0 ? `Falta ${formatBRL(remaining)}` : "Quitado"}
-        </p>
+        {a.status !== "CANCELLED" && a.status !== "EXPIRED" && (
+          <p className="mt-1 text-xs text-plum-600/60">{remaining > 0 ? `Falta ${formatBRL(remaining)}` : "Quitado"}</p>
+        )}
       </div>
       <ChevronRight className="size-4 text-plum-600/30 transition group-hover:translate-x-0.5 group-hover:text-lavender-600" />
     </Link>

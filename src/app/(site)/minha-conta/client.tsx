@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
 import { cancelMyAppointmentAction, updateProfileAction } from "./actions";
 import { SubmitButton } from "@/components/ui/client";
+import { PhoneHint } from "@/components/ui/PhoneHint";
 import { formatPhone } from "@/lib/format";
 
 export function CancelButton({ appointmentId, paid }: { appointmentId: string; paid: boolean }) {
@@ -44,7 +45,17 @@ export function ProfileForm({ name, phone, email }: { name: string; phone: strin
       </div>
       <div>
         <label className="label" htmlFor="pphone">WhatsApp</label>
-        <input id="pphone" name="phone" value={phoneValue} onChange={(e) => setPhoneValue(formatPhone(e.target.value))} className="field" inputMode="tel" />
+        <input
+          id="pphone"
+          name="phone"
+          value={phoneValue}
+          onChange={(e) => setPhoneValue(formatPhone(e.target.value))}
+          className="field"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder="(92) 99999-9999"
+        />
+        <PhoneHint phone={phoneValue} />
       </div>
       <div>
         <label className="label">E-mail</label>

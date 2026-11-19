@@ -1,4 +1,5 @@
 import "server-only";
+import { phoneWithCountry } from "@/lib/format";
 import { toStudioIso } from "@/lib/time";
 
 /**
@@ -25,6 +26,16 @@ export function infinitePayHandle() {
   return (process.env.INFINITEPAY_HANDLE ?? "").trim().replace(/^\$/, "");
 }
 
+class InfinitePayError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly data: Record<string, unknown>,
+  ) {
+    super(message);
+  }
+}
+
 async function call<T>(path: string, body: unknown): Promise<T> {
   const apiKey = process.env.INFINITEPAY_API_KEY?.trim();
   const res = await fetch(`${API}${path}`, {
@@ -37,19 +48,17 @@ async function call<T>(path: string, body: unknown): Promise<T> {
   const data = (await res.json().catch(() => ({}))) as T & { message?: string; error?: string };
   if (!res.ok) {
     console.error("[infinitepay]", res.status, path, JSON.stringify(data));
-    throw new Error(data?.message || data?.error || `InfinitePay respondeu ${res.status}`);
+    throw new InfinitePayError(data?.message || data?.error || `InfinitePay respondeu ${res.status}`, res.status, data);
   }
   return data;
 }
 
 const isPublicUrl = (url: string) => url.startsWith("https://") && !url.includes("localhost");
 
-/** "+5511999887766" a partir de qualquer formato de telefone brasileiro. */
+/** "+5592999887766", ou undefined se o telefone não estiver completo (a InfinitePay recusaria o link). */
 function phoneE164(phone: string) {
-  let d = phone.replace(/\D/g, "");
-  if (!d) return undefined;
-  if (!d.startsWith("55")) d = `55${d}`;
-  return `+${d}`;
+  const d = phoneWithCountry(phone);
+  return d ? `+${d}` : undefined;
 }
 
 export async function createCheckoutLink(opts: {
@@ -89,7 +98,17 @@ export async function createCheckoutLink(opts: {
         }
       : {}),
   };
-  const r = await call<Record<string, unknown>>("/links", body);
+  let r: Record<string, unknown>;
+  try {
+    r = await call<Record<string, unknown>>("/links", body);
+  } catch (err) {
+    // Os dados da cliente só servem para adiantar o preenchimento no checkout: se a InfinitePay
+    // recusar algum (telefone, e-mail…), gera o link sem eles em vez de travar o pagamento.
+    const errors = err instanceof InfinitePayError ? (err.data.errors as Record<string, unknown> | undefined) : undefined;
+    if (!errors?.customer) throw err;
+    console.warn("[infinitepay] dados da cliente recusados, gerando o link sem eles:", JSON.stringify(errors.customer));
+    r = await call<Record<string, unknown>>("/links", { ...body, customer: undefined });
+  }
   // A documentação não fixa o nome do campo: aceitamos as variações comuns.
   const url = [r.url, r.link, r.checkout_url, r.payment_url, (r.data as Record<string, unknown> | undefined)?.url].find(
     (v): v is string => typeof v === "string" && v.startsWith("http"),

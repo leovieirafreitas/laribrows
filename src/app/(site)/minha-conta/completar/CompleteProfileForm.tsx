@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { completeProfileAction } from "../actions";
 import { SubmitButton } from "@/components/ui/client";
+import { PhoneHint } from "@/components/ui/PhoneHint";
 import { formatPhone } from "@/lib/format";
 
 export function CompleteProfileForm({ name, phone, email, next }: { name: string; phone: string; email: string; next: string }) {
@@ -42,7 +43,7 @@ export function CompleteProfileForm({ name, phone, email, next }: { name: string
           value={phoneValue}
           onChange={(e) => setPhoneValue(formatPhone(e.target.value))}
         />
-        <p className="mt-2 text-xs text-plum-600/60">É por aqui que você recebe a confirmação e o lembrete dos horários.</p>
+        <PhoneHint phone={phoneValue} extra="É por aqui que você recebe a confirmação e o lembrete dos horários." />
       </div>
       <div>
         <label className="label">E-mail</label>

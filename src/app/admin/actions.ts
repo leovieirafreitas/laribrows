@@ -8,7 +8,7 @@ import { hasConflict, loadScheduleContext } from "@/lib/availability";
 import { approvePayment } from "@/lib/booking";
 import { requireAdmin, startSession } from "@/lib/auth";
 import { admins, appointments, dateOverrides, db, payments, services, settings, timeBlocks, workingHours, type AppointmentStatus, type PaymentMethod } from "@/lib/db";
-import { parseBRL } from "@/lib/format";
+import { formatPhone, isValidPhone, parseBRL } from "@/lib/format";
 import { servicePrice } from "@/lib/pricing";
 import { getSettings, invalidateSettingsCache, promoOf } from "@/lib/settings";
 import { addDays, dayIndex, isValidDate, timeToMin, todayInStudio, weekdayOf } from "@/lib/time";
@@ -135,10 +135,12 @@ export async function createManualAppointmentAction(_prev: ActionState, fd: Form
   const date = str(fd, "date");
   const start = time(fd, "time");
   const name = str(fd, "clientName");
-  const phone = str(fd, "clientPhone");
+  const typedPhone = str(fd, "clientPhone");
+  const phone = formatPhone(typedPhone);
   if (!service) return { ok: false, message: "Escolha o procedimento." };
   if (!isValidDate(date) || start == null) return { ok: false, message: "Informe data e horário." };
-  if (name.length < 2 || phone.replace(/\D/g, "").length < 10) return { ok: false, message: "Informe nome e WhatsApp da cliente." };
+  if (name.length < 2) return { ok: false, message: "Informe o nome da cliente." };
+  if (!isValidPhone(typedPhone)) return { ok: false, message: "Informe o WhatsApp da cliente com DDD, por exemplo (92) 99999-9999." };
 
   const priceInput = str(fd, "price");
   const current = servicePrice(service, promoOf(await getSettings()), todayInStudio());

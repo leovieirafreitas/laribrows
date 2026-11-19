@@ -1,4 +1,5 @@
 import "server-only";
+import { phoneWithCountry } from "@/lib/format";
 
 /**
  * WhatsApp pela Evolution API (v2). Usa o token da própria instância — não a chave
@@ -77,9 +78,7 @@ export async function logoutWhatsapp() {
 
 /** Número no formato do WhatsApp: só dígitos, com DDI 55. */
 export function toWhatsappNumber(phone: string) {
-  const d = phone.replace(/\D/g, "");
-  if (!d) return "";
-  return d.startsWith("55") && d.length >= 12 ? d : `55${d}`;
+  return phoneWithCountry(phone);
 }
 
 /** "(92) 99519-9964" a partir de "5592995199964" (ou do número salvo pelo WhatsApp sem o 9). */

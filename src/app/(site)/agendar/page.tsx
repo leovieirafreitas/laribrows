@@ -6,12 +6,21 @@ import { clientProfile, getClientUser } from "@/lib/client-auth";
 import { servicePrice } from "@/lib/pricing";
 import { availableMethods, getSettings, promoOf, publicSettings } from "@/lib/settings";
 import { todayInStudio } from "@/lib/time";
+import { turnstileSiteKey } from "@/lib/env";
+import { Notice } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Agendar horário" };
 
-export default async function AgendarPage({ searchParams }: { searchParams: Promise<{ servico?: string }> }) {
-  const { servico } = await searchParams;
+/** Avisos de quando a cliente confirma o e-mail pelo botão do e-mail (ver agendar/r/.../confirm). */
+const AVISOS: Record<string, string> = {
+  horario: "Seu e-mail foi confirmado, mas esse horário acabou de ser reservado por outra pessoa. Escolha outro, por favor.",
+  erro: "Seu e-mail foi confirmado, mas não conseguimos gerar o pagamento. Tente de novo abaixo.",
+  refazer: "E-mail confirmado! O pedido anterior expirou: escolha o horário de novo para concluir.",
+};
+
+export default async function AgendarPage({ searchParams }: { searchParams: Promise<{ servico?: string; aviso?: string }> }) {
+  const { servico, aviso } = await searchParams;
   const [s, rows] = await Promise.all([
     getSettings(),
     db
@@ -44,6 +53,11 @@ export default async function AgendarPage({ searchParams }: { searchParams: Prom
           Reserve seu <em className="text-lavender-600">momento</em>
         </h1>
       </div>
+      {aviso && AVISOS[aviso] && (
+        <div className="mt-8 max-w-2xl">
+          <Notice tone={aviso === "refazer" ? "success" : "warn"}>{AVISOS[aviso]}</Notice>
+        </div>
+      )}
       <BookingFlow
         services={list}
         settings={publicSettings(s)}
@@ -51,6 +65,7 @@ export default async function AgendarPage({ searchParams }: { searchParams: Prom
         today={todayInStudio()}
         simulation={simulation}
         prefill={prefill}
+        turnstileSiteKey={client ? "" : turnstileSiteKey()}
       />
     </div>
   );

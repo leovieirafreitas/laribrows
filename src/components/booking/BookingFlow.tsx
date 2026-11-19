@@ -2,10 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { ArrowLeft, ArrowRight, Check, Clock, CreditCard, Loader2, QrCode, ShieldCheck, Sparkles } from "lucide-react";
-import { createBookingAction } from "@/app/(site)/agendar/actions";
+import { ArrowLeft, ArrowRight, Check, Clock, CreditCard, Loader2, Mail, QrCode, RotateCw, ShieldCheck, Sparkles } from "lucide-react";
+import { confirmBookingCodeAction, createBookingAction, sendBookingCodeAction } from "@/app/(site)/agendar/actions";
+import { Turnstile } from "@/components/ui/Turnstile";
 import { Calendar, type DayStatus } from "@/components/booking/Calendar";
-import { formatBRL, formatDuration, formatPhone } from "@/lib/format";
+import { formatBRL, formatDuration, formatPhone, isValidPhone } from "@/lib/format";
+import { PhoneHint } from "@/components/ui/PhoneHint";
 import { depositCents } from "@/lib/pricing";
 import type { PublicSettings } from "@/lib/settings";
 import { addMonths, formatDateLong, minToTime, STUDIO_TZ_LABEL } from "@/lib/time";
@@ -22,6 +24,7 @@ export function BookingFlow({
   today,
   simulation,
   prefill,
+  turnstileSiteKey,
 }: {
   services: ServiceOption[];
   settings: PublicSettings;
@@ -29,6 +32,8 @@ export function BookingFlow({
   today: string;
   simulation: boolean;
   prefill: { name: string; phone: string; email: string } | null;
+  /** Chave do CAPTCHA (vazia quando a cliente já está logada: não precisa de código). */
+  turnstileSiteKey: string;
 }) {
   const router = useRouter();
   const [step, setStep] = useState(initialServiceId ? 1 : 0);
@@ -48,6 +53,14 @@ export function BookingFlow({
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Confirmação do e-mail por código antes do pagamento (quem já está logada pula esta parte).
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(prefill?.email ?? null);
+  const [codeFor, setCodeFor] = useState<{ draftId: string; email: string } | null>(null);
+  const [code, setCode] = useState("");
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaAttempt, setCaptchaAttempt] = useState(0);
+  const [resent, setResent] = useState(false);
 
   const service = services.find((x) => x.id === serviceId) ?? null;
 
@@ -113,7 +126,7 @@ export function BookingFlow({
     return g.filter((x) => x.items.length);
   }, [slots]);
 
-  const phoneOk = phone.replace(/\D/g, "").length >= 10;
+  const phoneOk = isValidPhone(phone);
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const canNext = [!!service, !!date && time != null, name.trim().length >= 3 && phoneOk && emailOk, true][step];
 
@@ -123,33 +136,84 @@ export function BookingFlow({
     setTime(null);
   }
 
-  function submit() {
+  function goToStep(n: number) {
+    setCodeFor(null);
+    setError(null);
+    setStep(n);
+  }
+
+  function payload() {
+    return {
+      serviceId: service!.id,
+      date: date!,
+      startMin: time!,
+      clientName: name,
+      clientPhone: phone,
+      clientEmail: email,
+      notes,
+      method: s.chargeMode === "none" ? null : method,
+      payOption,
+      accepted: accepted as true,
+    };
+  }
+
+  function handleFailure(message: string) {
+    setError(message);
+    if (/horário/i.test(message)) {
+      setCodeFor(null);
+      setTime(null);
+      setStep(1);
+      setRefreshKey((k) => k + 1); // recarrega dias e horários
+    }
+  }
+
+  function go(res: { redirectTo: string; external: boolean }) {
+    if (res.external) window.location.href = res.redirectTo;
+    else router.push(res.redirectTo);
+  }
+
+  /** Botão Pagar: com e-mail confirmado, grava e vai para o pagamento; sem, manda o código. */
+  function pay() {
     if (!service || !date || time == null) return;
     setError(null);
+    if (!verifiedEmail) return sendCode();
     startTransition(async () => {
-      const res = await createBookingAction({
-        serviceId: service.id,
-        date,
-        startMin: time,
-        clientName: name,
-        clientPhone: phone,
-        clientEmail: email,
-        notes,
-        method: s.chargeMode === "none" ? null : method,
-        payOption,
-        accepted: accepted as true,
-      });
-      if (!res.ok) {
-        setError(res.error);
-        if (/horário/i.test(res.error)) {
-          setTime(null);
-          setStep(1);
-          setRefreshKey((k) => k + 1); // recarrega dias e horários
-        }
-        return;
-      }
-      if (res.external) window.location.href = res.redirectTo;
-      else router.push(res.redirectTo);
+      const res = await createBookingAction(payload());
+      if (res.ok) return go(res);
+      if (res.needsCode) setVerifiedEmail(null);
+      handleFailure(res.error);
+    });
+  }
+
+  function sendCode(resend = false) {
+    if (turnstileSiteKey && !captcha) {
+      setError("Aguarde a verificação de segurança terminar e tente de novo.");
+      return;
+    }
+    const token = captcha ?? "";
+    setCaptcha(null); // o token vale uma vez só: o widget recomeça e gera outro
+    setCaptchaAttempt((n) => n + 1);
+    setError(null);
+    startTransition(async () => {
+      const res = await sendBookingCodeAction(payload(), token);
+      if (!res.ok) return handleFailure(res.error);
+      setCodeFor({ draftId: res.draftId, email: res.email });
+      setCode("");
+      setResent(resend);
+    });
+  }
+
+  function confirmCode() {
+    if (!codeFor) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await confirmBookingCodeAction(codeFor.draftId, code);
+      if ("verified" in res && res.verified) setVerifiedEmail(codeFor.email);
+      if (res.ok) return go(res);
+      if ("expired" in res) setCodeFor(null);
+      handleFailure(res.error);
+      // E-mail já confirmado, mas a reserva falhou: a próxima tentativa não pede código.
+      if ("verified" in res && res.verified) setCodeFor(null);
     });
   }
 
@@ -165,7 +229,7 @@ export function BookingFlow({
               <button
                 type="button"
                 disabled={i > step}
-                onClick={() => setStep(i)}
+                onClick={() => goToStep(i)}
                 className={`flex items-center gap-2 rounded-full py-1 pr-3 pl-1 text-xs tracking-wide transition ${i === step ? "bg-white text-plum-900 shadow-card" : i < step ? "text-plum-700 hover:bg-white/60" : "text-plum-600/40"}`}
               >
                 <span className={`grid size-6 place-items-center rounded-full text-[0.65rem] ${i < step ? "bg-lavender-500 text-white" : i === step ? "bg-plum-900 text-white" : "bg-lavender-100 text-plum-600/50"}`}>
@@ -292,15 +356,16 @@ export function BookingFlow({
                 </div>
                 <div>
                   <label className="label" htmlFor="phone">WhatsApp</label>
-                  <input id="phone" className="field" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} inputMode="tel" autoComplete="tel" placeholder="(11) 98765-4321" />
+                  <input id="phone" className="field" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} inputMode="tel" autoComplete="tel" placeholder="(92) 99999-9999" />
+                  <PhoneHint phone={phone} />
                 </div>
                 <div>
                   <label className="label" htmlFor="email">E-mail</label>
-                  <input id="email" type="email" className="field" value={email} onChange={(e) => setEmail(e.target.value)} readOnly={!!prefill} autoComplete="email" placeholder="voce@email.com" />
-                  {prefill ? (
-                    <p className="mt-1.5 text-xs text-plum-600/60">Logada na área da cliente.</p>
+                  <input id="email" type="email" className="field" value={email} onChange={(e) => setEmail(e.target.value)} readOnly={!!verifiedEmail} autoComplete="email" placeholder="voce@email.com" />
+                  {verifiedEmail ? (
+                    <p className="mt-1.5 text-xs text-plum-600/60">{prefill ? "Logada na área da cliente." : "E-mail confirmado."}</p>
                   ) : (
-                    <p className="mt-1.5 text-xs text-plum-600/60">Com este e-mail você acompanha tudo em Minha conta.</p>
+                    <p className="mt-1.5 text-xs text-plum-600/60">Antes do pagamento, enviamos um código para este e-mail para confirmar que é seu.</p>
                   )}
                 </div>
                 <div className="sm:col-span-2">
@@ -312,7 +377,44 @@ export function BookingFlow({
           )}
 
           {/* 4 — Pagamento / confirmação */}
-          {step === 3 && service && (
+          {step === 3 && service && codeFor && (
+            <div className="animate-fade-up">
+              <h2 className="flex items-center gap-2.5 font-display text-3xl">
+                <Mail className="size-6 text-lavender-600" /> Confirme seu e-mail
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-plum-600/80">
+                {resent ? "Enviamos um novo código" : "Enviamos um código de 6 dígitos"} para <strong className="font-medium text-plum-900">{codeFor.email}</strong>.
+                Digite abaixo para confirmar que o e-mail é seu e seguir para o pagamento.
+              </p>
+              <label className="label mt-6" htmlFor="code">Código</label>
+              <input
+                id="code"
+                className="field text-center font-display text-3xl tracking-[0.4em]"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && code.length === 6 && !pending) confirmCode();
+                }}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                placeholder="••••••"
+              />
+              <p className="mt-3 text-xs leading-relaxed text-plum-600/70">
+                Não chegou? Olhe o spam e a aba Promoções. Você também pode tocar no botão do e-mail: ele já leva direto para o pagamento.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={() => sendCode(true)}>
+                  <RotateCw className="size-3.5" /> Reenviar código
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={() => goToStep(2)}>
+                  Trocar e-mail
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && service && !codeFor && (
             <div className="animate-fade-up">
               <h2 className="font-display text-3xl">{s.chargeMode === "none" ? "Confirme seu horário" : "Garanta seu horário"}</h2>
 
@@ -388,7 +490,18 @@ export function BookingFlow({
             </div>
           )}
 
-          {step === 3 && s.chargeMode !== "none" && s.checkoutNote && (
+          {step === 3 && !verifiedEmail && turnstileSiteKey && (
+            <div className="mt-4">
+              <Turnstile
+                key={captchaAttempt}
+                siteKey={turnstileSiteKey}
+                onToken={setCaptcha}
+                onError={() => setError("Não foi possível carregar a verificação de segurança. Recarregue a página.")}
+              />
+            </div>
+          )}
+
+          {step === 3 && !codeFor && s.chargeMode !== "none" && s.checkoutNote && (
             <p className="mt-6 flex gap-2.5 text-xs leading-relaxed text-plum-600/80">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-lavender-600" />
               {s.checkoutNote}
@@ -400,7 +513,7 @@ export function BookingFlow({
           {/* Navegação */}
           <div className="mt-8 flex items-center justify-between gap-3 border-t border-lavender-100 pt-6">
             {step > 0 ? (
-              <button type="button" className="btn btn-ghost" onClick={() => setStep((x) => x - 1)}>
+              <button type="button" className="btn btn-ghost" onClick={() => goToStep(codeFor ? step : step - 1)}>
                 <ArrowLeft className="size-4" /> Voltar
               </button>
             ) : (
@@ -410,12 +523,17 @@ export function BookingFlow({
               <button type="button" className="btn btn-primary" disabled={!canNext} onClick={() => setStep((x) => x + 1)}>
                 Continuar <ArrowRight className="size-4" />
               </button>
+            ) : codeFor ? (
+              <button type="button" className="btn btn-primary" disabled={pending || code.length < 6} onClick={confirmCode}>
+                {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                {s.chargeMode === "none" ? "Confirmar e agendar" : "Confirmar e pagar"}
+              </button>
             ) : (
               <button
                 type="button"
                 className="btn btn-primary"
                 disabled={pending || !accepted || (s.chargeMode !== "none" && !method)}
-                onClick={submit}
+                onClick={pay}
               >
                 {pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                 {s.chargeMode === "none" ? "Confirmar agendamento" : `Pagar ${formatBRL(dueNow)}`}
