@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireClientUser } from "@/lib/client-auth";
 import { ClientActionError, cancelByClient, rescheduleByClient } from "@/lib/client-booking";
 import { onlyDigits } from "@/lib/format";
+import { clientIp, MINUTE, tooMany } from "@/lib/rate-limit";
 import { siteUrl } from "@/lib/settings";
 import { createSupabase } from "@/lib/supabase/server";
 import { isValidDate } from "@/lib/time";
@@ -26,6 +27,8 @@ function authErrorMessage(message: string, step: "send" | "verify") {
 export async function sendCodeAction(_prev: LoginState, fd: FormData): Promise<LoginState> {
   const email = String(fd.get("email") ?? "").trim().toLowerCase();
   if (!z.email().safeParse(email).success) return { step: "email", email, error: "Digite um e-mail válido." };
+  // Protege a cota de e-mails: 5 pedidos de código por IP a cada 10 minutos.
+  if (tooMany(`otp:ip:${await clientIp()}`, 5, 10 * MINUTE)) return { step: "email", email, error: authErrorMessage("rate limit", "send") };
   const supabase = await createSupabase();
   const { error } = await supabase.auth.signInWithOtp({
     email,
@@ -43,6 +46,10 @@ export async function verifyCodeAction(_prev: LoginState, fd: FormData): Promise
   const email = String(fd.get("email") ?? "").trim().toLowerCase();
   const token = onlyDigits(String(fd.get("code") ?? ""));
   if (token.length < 6) return { step: "code", email, error: "Digite o código que chegou no e-mail." };
+  // Adivinhação de código: 8 tentativas por e-mail e 30 por IP a cada 10 minutos.
+  if (tooMany(`otpv:email:${email}`, 8, 10 * MINUTE) || tooMany(`otpv:ip:${await clientIp()}`, 30, 10 * MINUTE)) {
+    return { step: "code", email, error: authErrorMessage("rate limit", "verify") };
+  }
   const supabase = await createSupabase();
   const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
   if (error) return { step: "code", email, error: authErrorMessage(error.message, "verify") };

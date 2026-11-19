@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gt, inArray, lt, ne, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, lt, ne, or, sql } from "drizzle-orm";
 import { appointments, db, payments, services, type Appointment, type Payment, type Settings } from "@/lib/db";
 import { BLOCKING_STATUSES, computeSlots, loadScheduleContext } from "@/lib/availability";
 import { MIN_ONLINE_CENTS } from "@/lib/pricing";
@@ -56,6 +56,23 @@ export async function createBooking(input: CreateBookingInput) {
     const methods = availableMethods(s);
     if (input.method === "PIX" && !methods.pix) throw new BookingError("PIX indisponível no momento.");
     if (input.method === "CARD" && !methods.card) throw new BookingError("Cartão indisponível no momento.");
+  }
+
+  // Uma mesma pessoa não segura vários horários sem pagar (evita travar a agenda).
+  if (needsPayment) {
+    const email = input.clientEmail.trim().toLowerCase();
+    const phone = input.clientPhone.replace(/\D/g, "");
+    const [{ n }] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.status, "PENDING_PAYMENT"),
+          gt(appointments.expiresAt, new Date()),
+          or(eq(appointments.clientEmail, email), sql`regexp_replace(${appointments.clientPhone}, '[^0-9]', '', 'g') = ${phone}`),
+        ),
+      );
+    if (n >= 2) throw new BookingError("Você já tem reservas aguardando pagamento. Conclua ou aguarde vencerem antes de reservar outro horário.");
   }
 
   const holdMinutes = Math.max(s.holdMinutes, input.method === "PIX" && usesMercadoPagoPix(s) ? 30 : 10);
@@ -284,6 +301,14 @@ export async function syncInfinitePayPayment(opts: { orderNsu: string; transacti
   if (!check.paid) return local;
   if (check.amountCents < local.amountCents) {
     console.warn("[infinitepay] valor pago menor que o esperado", opts.orderNsu, check.amountCents, local.amountCents);
+    return local;
+  }
+  // Uma transação paga confirma um único pagamento (não dá para reaproveitar o comprovante em outra reserva).
+  const reused = await db.query.payments.findFirst({
+    where: and(eq(payments.provider, "infinitepay"), eq(payments.providerRef, opts.transactionNsu), ne(payments.id, local.id)),
+  });
+  if (reused) {
+    console.warn("[infinitepay] transação já usada em outro pagamento", opts.transactionNsu, reused.id, local.id);
     return local;
   }
   if (check.method) await db.update(payments).set({ method: check.method }).where(eq(payments.id, local.id));

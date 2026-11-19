@@ -7,11 +7,13 @@ import { SubmitButton } from "@/components/ui/client";
 import { db, services, type Service } from "@/lib/db";
 import { centsToInput, formatBRL, formatDuration } from "@/lib/format";
 import { getSettings } from "@/lib/settings";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Procedimentos" };
 
 export default async function ProcedimentosPage() {
+  await requireAdmin();
   const [list, s] = await Promise.all([db.select().from(services).orderBy(asc(services.sortOrder), asc(services.name)), getSettings()]);
 
   return (

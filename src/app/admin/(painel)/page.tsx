@@ -10,11 +10,13 @@ import { getWhatsappStatus } from "@/lib/whatsapp";
 import { formatBRL } from "@/lib/format";
 import { availableMethods, getSettings } from "@/lib/settings";
 import { formatDateCompact, formatDateLong, minToTime } from "@/lib/time";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ senha?: string }> }) {
+  await requireAdmin();
   const [d, s, { senha }, clients, wa] = await Promise.all([getDashboardData(), getSettings(), searchParams, getClientStats(), getWhatsappStatus(3_000)]);
   const methods = availableMethods(s);
   const paymentWarning = s.chargeMode !== "none" && (methods.simulation || methods.missingSetup);

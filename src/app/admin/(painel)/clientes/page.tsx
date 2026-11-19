@@ -1,11 +1,13 @@
 import { PageHeader } from "@/components/admin/AppointmentItem";
 import { ClientsBrowser, type ClientRow } from "@/components/admin/ClientsBrowser";
 import { getClients, isRealClient } from "@/lib/clients";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Clientes" };
 
 export default async function ClientesPage({ searchParams }: { searchParams: Promise<{ aba?: string; q?: string }> }) {
+  await requireAdmin();
   const [{ aba = "todas", q = "" }, clients] = await Promise.all([searchParams, getClients()]);
   const list: ClientRow[] = clients.map((c) => ({
     id: c.id,

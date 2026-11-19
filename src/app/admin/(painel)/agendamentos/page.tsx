@@ -7,11 +7,13 @@ import { cleanupExpired } from "@/lib/availability";
 import { isHoldExpired } from "@/lib/booking";
 import { appointments, db } from "@/lib/db";
 import { addDays, todayInStudio } from "@/lib/time";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Agendamentos" };
 
 export default async function AgendamentosPage({ searchParams }: { searchParams: Promise<{ aba?: string; q?: string }> }) {
+  await requireAdmin();
   const { aba = "proximos", q = "" } = await searchParams;
   const today = todayInStudio();
 

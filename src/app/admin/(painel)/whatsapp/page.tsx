@@ -11,6 +11,7 @@ import { getWhatsappStatus } from "@/lib/whatsapp";
 import { recentWhatsappMessages } from "@/lib/whatsapp-notify";
 import { SAMPLE_VARS } from "@/lib/whatsapp-templates";
 import { whatsappTestAction } from "./actions";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "WhatsApp" };
@@ -18,6 +19,7 @@ export const metadata = { title: "WhatsApp" };
 const KIND_LABEL = { confirmacao: "Confirmação", lembrete: "Lembrete", studio: "Aviso ao studio", teste: "Teste" } as const;
 
 export default async function WhatsappPage() {
+  await requireAdmin();
   const [status, s, messages] = await Promise.all([getWhatsappStatus(), getSettings(), recentWhatsappMessages(25)]);
   const sample = { ...SAMPLE_VARS, studio: s.studioName, endereco: [s.address, s.city].filter(Boolean).join(", ") };
 

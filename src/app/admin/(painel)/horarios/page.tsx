@@ -7,11 +7,13 @@ import { SubmitButton } from "@/components/ui/client";
 import { DateField, TimeField } from "@/components/ui/pickers";
 import { dateOverrides, db, workingHours } from "@/lib/db";
 import { formatDateCompact, isValidDate, minToTime, todayInStudio, WEEKDAYS_LONG } from "@/lib/time";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Horários e bloqueios" };
 
 export default async function HorariosPage({ searchParams }: { searchParams: Promise<{ abrir?: string }> }) {
+  await requireAdmin();
   const { abrir } = await searchParams;
   const today = todayInStudio();
   const [hours, overrides] = await Promise.all([

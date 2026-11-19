@@ -7,11 +7,13 @@ import { getClients } from "@/lib/clients";
 import { appointments, db } from "@/lib/db";
 import { formatBRL, formatPhone, whatsappLink } from "@/lib/format";
 import { formatDateShort, formatStudioDateTime, nowInStudio } from "@/lib/time";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Cliente" };
 
 export default async function ClientePage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin();
   const { id } = await params;
   const client = (await getClients()).find((c) => c.id === id);
   if (!client) notFound();

@@ -5,6 +5,7 @@ import { BookingError, createBooking } from "@/lib/booking";
 import { getClientUser } from "@/lib/client-auth";
 import { createSupabase } from "@/lib/supabase/server";
 import { onlyDigits } from "@/lib/format";
+import { clientIp, MINUTE, tooMany } from "@/lib/rate-limit";
 import { isValidDate } from "@/lib/time";
 
 const schema = z.object({
@@ -28,6 +29,10 @@ export type BookingResult = { ok: true; redirectTo: string; external: boolean } 
 export async function createBookingAction(input: z.input<typeof schema>): Promise<BookingResult> {
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  // Robôs segurando horários: no máximo 6 reservas por IP a cada 10 minutos.
+  if (tooMany(`booking:ip:${await clientIp()}`, 6, 10 * MINUTE)) {
+    return { ok: false, error: "Muitas reservas seguidas. Aguarde alguns minutos ou fale com o studio pelo WhatsApp." };
+  }
   const client = await getClientUser();
   if (client) {
     parsed.data.clientEmail = client.email;

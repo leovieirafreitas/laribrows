@@ -20,11 +20,13 @@ import { getSettings } from "@/lib/settings";
 import { METHOD_LABEL, PAYMENT_STATUS_LABEL, PROVIDER_LABEL } from "@/lib/status";
 import { formatDateLong, formatStudioDateTime, minToTime } from "@/lib/time";
 import { whatsappConfigured } from "@/lib/whatsapp";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Agendamento" };
 
 export default async function AgendamentoAdminPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin();
   const { id } = await params;
   // Tudo em paralelo: uma única ida ao banco.
   const [a, pays, s] = await Promise.all([

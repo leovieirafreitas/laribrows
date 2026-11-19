@@ -7,11 +7,13 @@ import { cleanupExpired, daySchedule, loadScheduleContext } from "@/lib/availabi
 import { appointments, db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { isValidDate, minToTime, monthDates, todayInStudio } from "@/lib/time";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Agenda" };
 
 export default async function AgendaPage({ searchParams }: { searchParams: Promise<{ mes?: string; dia?: string }> }) {
+  await requireAdmin();
   const sp = await searchParams;
   const today = todayInStudio();
   const wanted = sp.dia && isValidDate(sp.dia) ? sp.dia : null;

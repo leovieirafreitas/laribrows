@@ -10,10 +10,11 @@ function key() {
   return new TextEncoder().encode(secret);
 }
 
-export type AdminSession = { adminId: string; name?: string; email?: string };
+export type AdminSession = { adminId: string; name?: string; email?: string; fp?: string };
 
-export async function signSession(admin: { id: string; name: string; email: string }) {
-  return new SignJWT({ sub: admin.id, name: admin.name, email: admin.email })
+/** fp = impressão da senha atual: trocar a senha invalida as sessões antigas. */
+export async function signSession(admin: { id: string; name: string; email: string; fp: string }) {
+  return new SignJWT({ sub: admin.id, name: admin.name, email: admin.email, fp: admin.fp })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_DAYS}d`)
@@ -28,6 +29,7 @@ export async function verifySession(token: string | undefined) {
     const session: AdminSession = { adminId: payload.sub };
     if (typeof payload.name === "string") session.name = payload.name;
     if (typeof payload.email === "string") session.email = payload.email;
+    if (typeof payload.fp === "string") session.fp = payload.fp;
     return session;
   } catch {
     return null;

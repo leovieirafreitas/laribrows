@@ -10,6 +10,7 @@ import { db, services } from "@/lib/db";
 import { formatBRL } from "@/lib/format";
 import { todayInStudio } from "@/lib/time";
 import { whatsappConfigured } from "@/lib/whatsapp";
+import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Novo agendamento" };
@@ -19,6 +20,7 @@ export default async function NovoAgendamentoPage({
 }: {
   searchParams: Promise<{ data?: string; nome?: string; tel?: string; email?: string }>;
 }) {
+  await requireAdmin();
   const { data, nome = "", tel = "", email = "" } = await searchParams;
   const list = await db.select().from(services).orderBy(asc(services.sortOrder), asc(services.name));
 

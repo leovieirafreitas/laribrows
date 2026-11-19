@@ -53,7 +53,7 @@ async function loadAccounts(): Promise<Account[]> {
     const r = await db.execute(sql`
       select lower(email) as email, raw_user_meta_data->>'name' as name, raw_user_meta_data->>'phone' as phone,
              created_at, last_sign_in_at
-      from auth.users where email is not null and deleted_at is null`);
+      from auth.users where email is not null and deleted_at is null and email_confirmed_at is not null`);
     return (r as unknown as { rows: Account[] }).rows ?? (r as unknown as Account[]);
   } catch {
     return []; // banco local (sem Supabase Auth)
