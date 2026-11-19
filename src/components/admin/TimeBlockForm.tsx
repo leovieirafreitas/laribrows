@@ -51,11 +51,11 @@ export function TimeBlockForm({ today, initialDate }: { today: string; initialDa
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">Das</label>
-          <TimeField name="start" defaultValue="18:00" ariaLabel="Início do bloqueio" />
+          <TimeField name="start" allowEmpty placeholder="Escolher" ariaLabel="Início do bloqueio" />
         </div>
         <div>
           <label className="label">Até</label>
-          <TimeField name="end" defaultValue="19:15" align="right" ariaLabel="Fim do bloqueio" />
+          <TimeField name="end" allowEmpty placeholder="Escolher" align="right" ariaLabel="Fim do bloqueio" />
         </div>
       </div>
       <div>
