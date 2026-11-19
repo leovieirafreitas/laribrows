@@ -122,6 +122,7 @@ As variáveis `NEXT_PUBLIC_*` são lidas quando o servidor roda (`src/lib/env.ts
 | `INFINITEPAY_HANDLE` | sua InfiniteTag (sem `$`) |
 | `INFINITEPAY_API_KEY` | recomendada: tira a etapa de endereço de entrega e faz o link expirar com a reserva |
 | `EVOLUTION_API_URL` / `EVOLUTION_INSTANCE` / `EVOLUTION_API_KEY` | WhatsApp pela Evolution API (token da instância) |
+| `TURNSTILE_SITE_KEY` | CAPTCHA do login da cliente (Site Key do Cloudflare Turnstile; a Secret Key vai no Supabase) |
 | `ALLOW_PAYMENT_SIMULATION` | **não defina** (ou `false`) |
 
 Também funciona na **Vercel** (importe o repositório e cadastre as mesmas variáveis; o `vercel.json` coloca o servidor em `iad1`, perto do banco em Ohio).

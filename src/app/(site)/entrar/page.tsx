@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { LoginFlow } from "./LoginFlow";
 import { Ornament } from "@/components/brand/Ornament";
 import { getClientUser } from "@/lib/client-auth";
+import { turnstileSiteKey } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Entrar · Área da cliente", robots: { index: false } };
@@ -24,7 +25,7 @@ export default async function EntrarPage({ searchParams }: { searchParams: Promi
         {erro === "link" && (
           <p className="mb-5 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">O link expirou ou já foi usado. Peça um novo código abaixo.</p>
         )}
-        <LoginFlow />
+        <LoginFlow turnstileSiteKey={turnstileSiteKey()} />
       </div>
     </div>
   );

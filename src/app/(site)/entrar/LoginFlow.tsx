@@ -4,9 +4,13 @@ import { ArrowLeft, Mail } from "lucide-react";
 import { startTransition, useActionState, useState } from "react";
 import { sendCodeAction, verifyCodeAction, type LoginState } from "@/app/(site)/minha-conta/actions";
 import { SubmitButton, FormPendingContext } from "@/components/ui/client";
+import { Turnstile } from "@/components/ui/Turnstile";
 
-export function LoginFlow() {
+export function LoginFlow({ turnstileSiteKey }: { turnstileSiteKey: string }) {
   const [sendState, send, sending] = useActionState(sendCodeAction, null);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaMsg, setCaptchaMsg] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [verifyState, verify, verifying] = useActionState(verifyCodeAction, null);
   const [email, setEmail] = useState("");
   const [changing, setChanging] = useState(false);
@@ -20,8 +24,16 @@ export function LoginFlow() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            if (turnstileSiteKey && !captcha) {
+              setCaptchaMsg("Aguarde a verificação de segurança terminar e tente de novo.");
+              return;
+            }
+            setCaptchaMsg(null);
             setChanging(false);
             const fd = new FormData(e.currentTarget);
+            if (captcha) fd.set("captchaToken", captcha);
+            setCaptcha(null); // o token vale uma vez só: o widget recomeça e gera outro
+            setAttempt((n) => n + 1);
             startTransition(() => send(fd));
           }}
           className="space-y-4"
@@ -31,7 +43,18 @@ export function LoginFlow() {
             <input id="email" name="email" type="email" required autoComplete="email" className="field" placeholder="voce@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
             <p className="mt-2 text-xs text-plum-600/60">Use o mesmo e-mail dos seus agendamentos.</p>
           </div>
-          {sendState?.error && <p className="rounded-2xl bg-rose-50 px-4 py-2.5 text-sm text-rose-700">{sendState.error}</p>}
+          {turnstileSiteKey && (
+            <Turnstile
+              key={attempt}
+              siteKey={turnstileSiteKey}
+              onToken={(t) => {
+                setCaptcha(t);
+                if (t) setCaptchaMsg(null);
+              }}
+              onError={() => setCaptchaMsg("Não foi possível carregar a verificação de segurança. Recarregue a página.")}
+            />
+          )}
+          {(captchaMsg || sendState?.error) && <p className="rounded-2xl bg-rose-50 px-4 py-2.5 text-sm text-rose-700">{captchaMsg || sendState?.error}</p>}
           <SubmitButton className="btn btn-primary w-full" pendingText="Enviando…">
             <Mail className="size-4" /> Receber código de acesso
           </SubmitButton>

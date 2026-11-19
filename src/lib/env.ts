@@ -13,6 +13,11 @@ export function siteUrl() {
   return (runtimeEnv("NEXT_PUBLIC_SITE_URL") || "http://localhost:3000").replace(/\/$/, "");
 }
 
+/** Chave pública do Cloudflare Turnstile (CAPTCHA do login da cliente). Vazia = sem CAPTCHA. */
+export function turnstileSiteKey() {
+  return runtimeEnv("TURNSTILE_SITE_KEY");
+}
+
 export function supabaseEnv() {
   return { url: runtimeEnv("NEXT_PUBLIC_SUPABASE_URL"), key: runtimeEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") };
 }

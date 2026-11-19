@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireClientUser } from "@/lib/client-auth";
 import { ClientActionError, cancelByClient, rescheduleByClient } from "@/lib/client-booking";
 import { onlyDigits } from "@/lib/format";
+import { turnstileSiteKey } from "@/lib/env";
 import { clientIp, MINUTE, tooMany } from "@/lib/rate-limit";
 import { siteUrl } from "@/lib/settings";
 import { createSupabase } from "@/lib/supabase/server";
@@ -15,6 +16,7 @@ export type LoginState = { step: "email" | "code"; email: string; error?: string
 
 function authErrorMessage(message: string, step: "send" | "verify") {
   if (/rate limit|too many|security purposes/i.test(message)) return "Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.";
+  if (/captcha/i.test(message)) return "Não foi possível confirmar que você não é um robô. Recarregue a página e tente de novo.";
   if (step === "send") {
     if (/email address .* invalid/i.test(message)) return "Esse e-mail não parece válido. Confira e tente de novo.";
     return "Não conseguimos enviar o e-mail agora. Tente novamente mais tarde ou fale com o studio.";
@@ -29,10 +31,12 @@ export async function sendCodeAction(_prev: LoginState, fd: FormData): Promise<L
   if (!z.email().safeParse(email).success) return { step: "email", email, error: "Digite um e-mail válido." };
   // Protege a cota de e-mails: 5 pedidos de código por IP a cada 10 minutos.
   if (tooMany(`otp:ip:${await clientIp()}`, 5, 10 * MINUTE)) return { step: "email", email, error: authErrorMessage("rate limit", "send") };
+  const captchaToken = String(fd.get("captchaToken") ?? "").slice(0, 4000) || undefined;
+  if (turnstileSiteKey() && !captchaToken) return { step: "email", email, error: authErrorMessage("captcha", "send") };
   const supabase = await createSupabase();
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { shouldCreateUser: true, emailRedirectTo: siteUrl() },
+    options: { shouldCreateUser: true, emailRedirectTo: siteUrl(), captchaToken },
   });
   if (error) {
     console.error("[entrar] signInWithOtp", error.message);
