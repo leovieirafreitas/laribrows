@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireClientUser } from "@/lib/client-auth";
+import { requireClientUser, saveStoredProfile } from "@/lib/client-auth";
 import { ClientActionError, cancelByClient, rescheduleByClient } from "@/lib/client-booking";
-import { onlyDigits } from "@/lib/format";
+import { formatPhone, onlyDigits } from "@/lib/format";
 import { turnstileSiteKey } from "@/lib/env";
 import { clientIp, MINUTE, tooMany } from "@/lib/rate-limit";
 import { siteUrl } from "@/lib/settings";
@@ -68,17 +68,58 @@ export async function signOutAction() {
 
 export type ProfileState = { ok: boolean; message: string } | null;
 
+/** Nome e WhatsApp da cliente: confere e devolve já formatados (ou a mensagem de erro). */
+function readProfile(fd: FormData): { name: string; phone: string } | { error: string } {
+  const name = String(fd.get("name") ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
+  let digits = onlyDigits(String(fd.get("phone") ?? ""));
+  if (digits.length >= 12 && digits.startsWith("55")) digits = digits.slice(2);
+  if (name.split(" ").length < 2 || name.length < 5) return { error: "Digite seu nome completo (nome e sobrenome)." };
+  if (digits.length < 10 || digits.length > 11) return { error: "Digite seu WhatsApp com DDD, por exemplo (92) 99999-9999." };
+  return { name, phone: formatPhone(digits) };
+}
+
+/**
+ * Grava o cadastro na tabela do sistema (fonte da verdade) e copia no perfil da conta,
+ * renovando a sessão para o nome novo aparecer na hora.
+ */
+async function saveProfile(email: string, name: string, phone: string) {
+  try {
+    await saveStoredProfile(email, name, phone);
+  } catch (e) {
+    console.error("[cadastro] não salvou", e);
+    return false;
+  }
+  try {
+    const supabase = await createSupabase();
+    const { error } = await supabase.auth.updateUser({ data: { name, phone } });
+    if (!error) await supabase.auth.refreshSession();
+  } catch {
+    /* a cópia no perfil da conta é opcional */
+  }
+  return true;
+}
+
 export async function updateProfileAction(_prev: ProfileState, fd: FormData): Promise<ProfileState> {
-  await requireClientUser();
-  const name = String(fd.get("name") ?? "").trim().slice(0, 80);
-  const phone = String(fd.get("phone") ?? "").trim();
-  if (name.length < 3) return { ok: false, message: "Informe seu nome completo." };
-  if (onlyDigits(phone).length < 10) return { ok: false, message: "Informe um WhatsApp válido." };
-  const supabase = await createSupabase();
-  const { error } = await supabase.auth.updateUser({ data: { name, phone } });
-  if (error) return { ok: false, message: "Não foi possível salvar agora." };
+  const user = await requireClientUser();
+  const p = readProfile(fd);
+  if ("error" in p) return { ok: false, message: p.error };
+  if (!(await saveProfile(user.email, p.name, p.phone))) return { ok: false, message: "Não foi possível salvar agora." };
   revalidatePath("/minha-conta");
   return { ok: true, message: "Dados salvos." };
+}
+
+export type CompleteProfileState = { error: string; name: string; phone: string } | null;
+
+/** Primeiro acesso: completa o cadastro e segue para onde a cliente queria ir. */
+export async function completeProfileAction(_prev: CompleteProfileState, fd: FormData): Promise<CompleteProfileState> {
+  const user = await requireClientUser();
+  const p = readProfile(fd);
+  const typed = { name: String(fd.get("name") ?? ""), phone: String(fd.get("phone") ?? "") };
+  if ("error" in p) return { error: p.error, ...typed };
+  if (!(await saveProfile(user.email, p.name, p.phone))) return { error: "Não foi possível salvar agora. Tente de novo.", ...typed };
+  const raw = String(fd.get("next") ?? "");
+  const next = /^\/(?![/\\])/.test(raw) && !raw.startsWith("/minha-conta/completar") ? raw : "/minha-conta";
+  redirect(next);
 }
 
 export async function cancelMyAppointmentAction(appointmentId: string): Promise<{ ok: boolean; message: string }> {

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import { RescheduleFlow } from "./RescheduleFlow";
-import { requireClientUser } from "@/lib/client-auth";
+import { requireCompleteClient } from "@/lib/client-auth";
 import { changePolicy } from "@/lib/client-booking";
 import { appointments, db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
@@ -14,8 +14,8 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Remarcar horário", robots: { index: false } };
 
 export default async function RemarcarPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requireClientUser();
   const { id } = await params;
+  const user = await requireCompleteClient(`/minha-conta/remarcar/${id}`);
   const a = await db.query.appointments.findFirst({ where: and(eq(appointments.id, id), eq(appointments.clientEmail, user.email)) });
   if (!a) notFound();
   const s = await getSettings();

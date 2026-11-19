@@ -51,9 +51,13 @@ const iso = (d: Date) => d.toISOString();
 async function loadAccounts(): Promise<Account[]> {
   try {
     const r = await db.execute(sql`
-      select lower(email) as email, raw_user_meta_data->>'name' as name, raw_user_meta_data->>'phone' as phone,
-             created_at, last_sign_in_at
-      from auth.users where email is not null and deleted_at is null and email_confirmed_at is not null`);
+      select lower(u.email) as email,
+             coalesce(p.name, u.raw_user_meta_data->>'name') as name,
+             coalesce(p.phone, u.raw_user_meta_data->>'phone') as phone,
+             u.created_at, u.last_sign_in_at
+      from auth.users u
+      left join public.client_profiles p on p.email = lower(u.email)
+      where u.email is not null and u.deleted_at is null and u.email_confirmed_at is not null`);
     return (r as unknown as { rows: Account[] }).rows ?? (r as unknown as Account[]);
   } catch {
     return []; // banco local (sem Supabase Auth)
@@ -153,8 +157,9 @@ export const getClients = cache(async (): Promise<ClientSummary[]> => {
     const c = touch(acc.email, () => blank(acc.email, created));
     c.hasAccount = true;
     c.email = acc.email;
-    if (!c.name && acc.name) c.name = acc.name;
-    if (!c.phone && acc.phone) c.phone = acc.phone;
+    // O cadastro que a própria cliente fez na área de membros vale mais que o dos agendamentos.
+    if (acc.name) c.name = acc.name;
+    if (acc.phone) c.phone = acc.phone;
     if (iso(created) < c.firstSeen) c.firstSeen = iso(created);
     if (acc.last_sign_in_at) {
       const last = iso(new Date(acc.last_sign_in_at));

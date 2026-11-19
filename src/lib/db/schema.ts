@@ -178,6 +178,14 @@ export const settings = pgTable("settings", {
   waStudioAlerts: boolean("wa_studio_alerts").notNull().default(true),
 }).enableRLS();
 
+/** Cadastro da cliente da área de membros (nome e WhatsApp), pelo e-mail da conta. */
+export const clientProfiles = pgTable("client_profiles", {
+  email: text("email").primaryKey(),
+  name: text("name").notNull(),
+  phone: text("phone").notNull(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+}).enableRLS();
+
 /** Histórico de mensagens de WhatsApp enviadas pelo sistema. */
 export const whatsappMessages = pgTable(
   "whatsapp_messages",

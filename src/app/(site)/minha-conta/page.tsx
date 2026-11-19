@@ -6,7 +6,7 @@ import { signOutAction } from "./actions";
 import { CancelButton, ProfileForm } from "./client";
 import { StatusBadge } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/client";
-import { clientProfile, requireClientUser } from "@/lib/client-auth";
+import { clientProfile, requireCompleteClient } from "@/lib/client-auth";
 import { changePolicy, splitAppointments } from "@/lib/client-booking";
 import { appointments, db, type Appointment, type Settings } from "@/lib/db";
 import { formatBRL, whatsappLink } from "@/lib/format";
@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Minha conta", robots: { index: false } };
 
 export default async function MinhaContaPage() {
-  const user = await requireClientUser();
+  const user = await requireCompleteClient("/minha-conta");
   const [s, list, profile] = await Promise.all([
     getSettings(),
     db.select().from(appointments).where(eq(appointments.clientEmail, user.email)).orderBy(desc(appointments.date), desc(appointments.startMin)),
