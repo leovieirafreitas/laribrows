@@ -143,7 +143,7 @@ export async function createManualAppointmentAction(_prev: ActionState, fd: Form
   if (!isValidPhone(typedPhone)) return { ok: false, message: "Informe o WhatsApp da cliente com DDD, por exemplo (92) 99999-9999." };
 
   const priceInput = str(fd, "price");
-  const current = servicePrice(service, promoOf(await getSettings()), todayInStudio());
+  const current = servicePrice(service, promoOf(await getSettings()), todayInStudio(), date);
   const total = priceInput ? parseBRL(priceInput) : current.priceCents;
   const paid = str(fd, "paid") ? parseBRL(str(fd, "paid")) : 0;
   if (!Number.isFinite(total) || total < 0 || !Number.isFinite(paid) || paid < 0) return { ok: false, message: "Valores inválidos." };

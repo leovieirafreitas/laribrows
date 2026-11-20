@@ -7,7 +7,7 @@ import larissa from "@/assets/larissa.jpg";
 import { SectionTitle } from "@/components/ui";
 import { db, services } from "@/lib/db";
 import { formatBRL, formatDuration } from "@/lib/format";
-import { servicePrice } from "@/lib/pricing";
+import { promoEndLabel, servicePrice } from "@/lib/pricing";
 import { getSettings, promoOf } from "@/lib/settings";
 import { todayInStudio } from "@/lib/time";
 
@@ -20,6 +20,7 @@ export default async function HomePage() {
   ]);
   const today = todayInStudio();
   const list = rows.map((svc) => ({ ...svc, ...servicePrice(svc, promoOf(s), today) }));
+  const promoUntil = promoEndLabel(s.promoEnd);
 
   const depositText =
     s.chargeMode === "deposit"
@@ -135,6 +136,7 @@ export default async function HomePage() {
                         <p className="mt-1 text-sm text-plum-600/60 line-through">{formatBRL(svc.fullPriceCents)}</p>
                       )}
                       <p className={`font-display text-3xl text-plum-900 ${svc.fullPriceCents != null ? "" : "mt-1"}`}>{formatBRL(svc.priceCents)}</p>
+                      {svc.promoLabel && promoUntil && <p className="text-[0.7rem] text-plum-600/60">atendimentos até {promoUntil}</p>}
                     </div>
                     <Link href={`/agendar?servico=${svc.id}`} className="btn btn-soft btn-sm">
                       Agendar

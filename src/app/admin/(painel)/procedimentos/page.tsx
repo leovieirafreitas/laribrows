@@ -156,7 +156,7 @@ function PromoSection({ s, withPromo }: { s: Settings; withPromo: number }) {
       </div>
       <p className="mt-1 text-sm text-plum-600/70">
         Com a promoção valendo, o site mostra o preço normal riscado e cobra o preço promocional de cada procedimento (inclusive no sinal). Vale para
-        agendamentos feitos dentro do período. {withPromo === 0 && "Nenhum procedimento tem preço promocional ainda: preencha em cada um, abaixo."}
+        atendimentos com data dentro do período: quem agenda agora para depois do fim paga o preço normal. {withPromo === 0 && "Nenhum procedimento tem preço promocional ainda: preencha em cada um, abaixo."}
         {withPromo > 0 && `${withPromo} procedimento(s) com preço promocional.`}
       </p>
       <ActionForm action={savePromoAction} className="mt-5 grid gap-4 sm:grid-cols-[1fr_14rem_14rem]">

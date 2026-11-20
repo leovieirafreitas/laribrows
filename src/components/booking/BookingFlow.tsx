@@ -8,7 +8,7 @@ import { Turnstile } from "@/components/ui/Turnstile";
 import { Calendar, type DayStatus } from "@/components/booking/Calendar";
 import { formatBRL, formatDuration, formatPhone, isValidPhone } from "@/lib/format";
 import { PhoneHint } from "@/components/ui/PhoneHint";
-import { depositCents } from "@/lib/pricing";
+import { depositCents, promoEndLabel } from "@/lib/pricing";
 import type { PublicSettings } from "@/lib/settings";
 import { addMonths, formatDateLong, minToTime, STUDIO_TZ_LABEL } from "@/lib/time";
 
@@ -62,7 +62,14 @@ export function BookingFlow({
   const [captchaAttempt, setCaptchaAttempt] = useState(0);
   const [resent, setResent] = useState(false);
 
-  const service = services.find((x) => x.id === serviceId) ?? null;
+  const baseService = services.find((x) => x.id === serviceId) ?? null;
+  // A promoção vale pelo dia do atendimento: escolhendo um dia depois do fim dela, o preço é o normal.
+  const promoEnd = s.promo?.end ?? "";
+  const promoUntil = promoEndLabel(promoEnd);
+  const service = useMemo(() => {
+    if (!baseService || baseService.fullPriceCents == null || !date || !promoEnd || date <= promoEnd) return baseService;
+    return { ...baseService, priceCents: baseService.fullPriceCents, fullPriceCents: null, promoLabel: "" };
+  }, [baseService, date, promoEnd]);
 
   // Dias do mês para o procedimento escolhido (a chave identifica a consulta atual)
   const daysKey = serviceId && step >= 1 ? `${serviceId}|${month}|${refreshKey}` : null;
@@ -273,6 +280,7 @@ export function BookingFlow({
                       <span className="text-right">
                         {svc.fullPriceCents != null && <span className="block text-xs text-plum-600/60 line-through">{formatBRL(svc.fullPriceCents)}</span>}
                         <span className="block font-display text-2xl">{formatBRL(svc.priceCents)}</span>
+                        {svc.promoLabel && promoUntil && <span className="block text-[0.7rem] text-plum-600/60">atendimentos até {promoUntil}</span>}
                         <span className="flex items-center justify-end gap-1 text-xs text-plum-600/60">
                           <Clock className="size-3" /> {formatDuration(svc.durationMin)}
                         </span>
@@ -303,6 +311,21 @@ export function BookingFlow({
                     setTime(null);
                   }}
                 />
+                {baseService?.promoLabel && promoUntil && (
+                  <p className="mt-4 rounded-xl border border-champagne-300 bg-champagne-200/50 px-4 py-3 text-xs leading-relaxed text-plum-700">
+                    {date && date > promoEnd ? (
+                      <>
+                        Para esse dia o valor é <strong className="font-medium">{formatBRL(service?.priceCents ?? 0)}</strong>. O preço de {baseService.promoLabel} vale
+                        para atendimentos até {promoUntil}.
+                      </>
+                    ) : (
+                      <>
+                        Preço de {baseService.promoLabel} ({formatBRL(baseService.priceCents)}) para atendimentos até {promoUntil}. Depois disso, o valor é{" "}
+                        {formatBRL(baseService.fullPriceCents ?? baseService.priceCents)}.
+                      </>
+                    )}
+                  </p>
+                )}
               </div>
               <div className="md:border-l md:border-lavender-100 md:pl-8">
                 <h2 className="font-display text-3xl">Horário</h2>

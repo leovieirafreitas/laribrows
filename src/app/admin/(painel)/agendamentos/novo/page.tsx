@@ -8,7 +8,7 @@ import { SubmitButton } from "@/components/ui/client";
 import { DateField, SelectField, TimeField } from "@/components/ui/pickers";
 import { db, services } from "@/lib/db";
 import { formatBRL } from "@/lib/format";
-import { servicePrice } from "@/lib/pricing";
+import { promoEndLabel, servicePrice } from "@/lib/pricing";
 import { getSettings, promoOf } from "@/lib/settings";
 import { todayInStudio } from "@/lib/time";
 import { whatsappConfigured } from "@/lib/whatsapp";
@@ -44,7 +44,9 @@ export default async function NovoAgendamentoPage({
             panelClassName="w-[22rem]"
             options={list.map((svc) => {
               const p = servicePrice(svc, promoOf(settingsRow), today);
-              const price = p.promoLabel ? `${p.promoLabel}: ${formatBRL(p.priceCents)} (de ${formatBRL(svc.priceCents)})` : formatBRL(p.priceCents);
+              const price = p.promoLabel
+                ? `${p.promoLabel}${settingsRow.promoEnd ? ` até ${promoEndLabel(settingsRow.promoEnd)}` : ""}: ${formatBRL(p.priceCents)} (de ${formatBRL(svc.priceCents)})`
+                : formatBRL(p.priceCents);
               return { value: svc.id, label: svc.name, hint: `${price} · ${svc.durationMin} min${svc.active ? "" : " · inativo"}` };
             })}
           />

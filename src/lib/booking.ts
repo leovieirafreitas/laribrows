@@ -43,8 +43,8 @@ async function validateBooking(input: CreateBookingInput) {
   });
   if (!service) throw new BookingError("Procedimento indisponível.");
 
-  // Preço de agora (promoção, se estiver valendo), calculado aqui no servidor.
-  const price = servicePrice(service, promoOf(s), todayInStudio());
+  // Preço calculado aqui no servidor. A promoção vale pelo dia do atendimento (dentro do período).
+  const price = servicePrice(service, promoOf(s), todayInStudio(), input.date);
   const dueNow = computeDueNow(s, price.priceCents, input.payOption);
   const needsPayment = dueNow > 0;
   if (needsPayment && dueNow < MIN_ONLINE_CENTS) {
